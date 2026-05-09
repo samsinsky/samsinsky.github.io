@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sam Sinsky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: rgb(240, 233, 226);
+      color: oklch(20% 0.01 240);
+      min-height: 100vh;
+    }
+
+    main {
+      max-width: 782px;
+      margin: 0 auto;
+      padding: 92px 37px 115px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 74px;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 300;
+      font-size: clamp(60px, 8vw, 83px);
+      color: oklch(15% 0.01 240);
+      letter-spacing: -0.01em;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    header p {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      color: oklch(55% 0.015 240);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── Socials ── */
+    .socials {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 83px;
+      flex-wrap: wrap;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+
+    .social-link {
+      position: relative;
+      display: inline-block;
+      width: 127px;
+      height: 127px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    .social-link img.profile {
+      width: 127px;
+      height: 127px;
+      border-radius: 50%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+    }
+
+    .social-link:hover img.profile {
+      transform: scale(1.06);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+    }
+
+    .social-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 37px;
+      height: 37px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 2.5px solid rgb(240, 233, 226);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition: transform 0.25s ease;
+    }
+
+    .social-link:hover .social-badge {
+      transform: scale(1.12);
+    }
+
+    .social-badge img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: oklch(86% 0.01 240);
+    }
+
+    .divider span {
+      font-family: 'Architects Daughter', cursive;
+      font-size: 16px;
+      color: oklch(60% 0.015 240);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ── Articles ── */
+    .articles {
+      display: grid;
+      gap: 10px;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+
+    .article-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 25px 30px;
+      background: white;
+      border-radius: 14px;
+      border: 1px solid oklch(90% 0.01 240);
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+
+    .article-card:hover {
+      background: oklch(95.5% 0.012 240);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+    }
+
+    .article-meta {
+      font-size: 10px;
+      color: oklch(58% 0.015 240);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
+
+    .article-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      font-size: 24px;
+      color: oklch(18% 0.01 240);
+      line-height: 1.25;
+    }
+
+    .article-arrow {
+      font-size: 18px;
+      color: oklch(68% 0.015 240);
+      transition: transform 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .article-card:hover .article-arrow {
+      transform: translateX(4px);
+      color: oklch(45% 0.02 240);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 520px) {
+      main { padding: 64px 20px 92px; }
+      .socials { gap: 20px; }
+      .social-link, .social-link img.profile { width: 100px; height: 100px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Sam Sinsky</h1>
+      <p>Product Manager</p>
+    </header>
+
+    <div class="socials">
+      <a class="social-link" href="https://www.linkedin.com/in/sam-sinsky/" target="_blank" rel="noopener noreferrer">
+        <img class="profile" src="uploads/sketch_img_6.png" alt="LinkedIn">
+        <span class="social-badge">
+          <img src="uploads/sketch_img_3.jpg" alt="LinkedIn logo">
+        </span>
+      </a>
+      <a class="social-link" href="https://github.com/samsinsky" target="_blank" rel="noopener noreferrer">
+        <img class="profile" src="uploads/sketch_img_5.png" alt="GitHub">
+        <span class="social-badge">
+          <svg viewBox="0 0 24 24" style="width:100%;height:100%;background:#1a1a1a;border-radius:50%">
+            <path d="M12 4C7.58 4 4 7.58 4 12c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.88-1.16-.88-1.16-.72-.49.06-.48.06-.48.8.06 1.22.82 1.22.82.71 1.21 1.86.86 2.31.66.07-.51.28-.86.5-1.06-1.77-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.7 7.7 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38C17.71 18.53 20 15.54 20 12c0-4.42-3.58-8-8-8z" fill="white"></path>
+          </svg>
+        </span>
+      </a>
+      <a class="social-link" href="https://twitter.com/samsinsky" target="_blank" rel="noopener noreferrer">
+        <img class="profile" src="uploads/sketch_img_7.png" alt="Twitter">
+        <span class="social-badge">
+          <img src="uploads/sketch_img_2.png" alt="Twitter logo">
+        </span>
+      </a>
+      <a class="social-link" href="https://medium.com/@samsinsky" target="_blank" rel="noopener noreferrer">
+        <img class="profile" src="uploads/sketch_img_1.jpg" alt="Medium">
+        <span class="social-badge">
+          <img src="uploads/sketch_img_0.webp" alt="Medium logo">
+        </span>
+      </a>
+    </div>
+
+    <div class="divider"><span>Writing</span></div>
+
+    <div class="articles">
+      <a class="article-card" href="https://medium.com/@samsinsky/every-ai-agent-should-be-a-coding-agent-123454001038" target="_blank" rel="noopener noreferrer">
+        <div>
+          <h2 class="article-title">Every AI Agent Should Be a Coding Agent</h2>
+        </div>
+        <span class="article-arrow">→</span>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
