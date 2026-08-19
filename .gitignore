@@ -1,2 +1,12 @@
 .DS_Store
 .vscode/
+
+# Personal floorplans and exports must never be committed. The tool keeps the
+# image in browser storage, but dev fixtures and exports can land here.
+floorplan/_dev*
+floorplan/*.png
+floorplan/*.jpg
+floorplan/*.jpeg
+floorplan/*.webp
+floorplan/*.json
+!floorplan/package.json

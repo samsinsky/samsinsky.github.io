@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Lay out furniture on a floorplan at true scale.">
+  <title>Floorplan Layout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel" id="panel">
+    <header class="panel-head">
+      <h1>Floorplan</h1>
+      <p id="scale-readout" class="scale-readout">No image yet</p>
+    </header>
+
+    <!-- 1 ─ Image -->
+    <section class="card" id="card-image">
+      <h2><span class="step">1</span> Floorplan image</h2>
+      <label class="button block" for="file-input">Choose an image…</label>
+      <input type="file" id="file-input" accept="image/*" hidden>
+      <p class="hint">Or drop one onto the canvas. It stays in this browser — it is never uploaded.</p>
+    </section>
+
+    <!-- 2 ─ Scale -->
+    <section class="card" id="card-scale">
+      <h2><span class="step">2</span> Scale</h2>
+      <button class="button block" id="btn-calibrate" type="button">Drag a line to set scale</button>
+      <div id="calibrate-form" class="subform" hidden>
+        <label for="real-length">That line's real length</label>
+        <input type="text" id="real-length" placeholder="14'5 or 173 or 14' 5&quot;" autocomplete="off">
+        <div class="row">
+          <button class="button primary" id="btn-apply-scale" type="button">Apply</button>
+          <button class="button" id="btn-cancel-scale" type="button">Cancel</button>
+        </div>
+        <p class="hint" id="calibrate-hint"></p>
+      </div>
+    </section>
+
+    <!-- 3 ─ Furniture -->
+    <section class="card" id="card-furniture">
+      <h2><span class="step">3</span> Furniture</h2>
+      <label for="preset">Start from</label>
+      <select id="preset">
+        <option value="">Custom…</option>
+      </select>
+      <label for="furn-name">Name</label>
+      <input type="text" id="furn-name" placeholder="Sofa" autocomplete="off">
+      <label for="furn-dims">Width × depth</label>
+      <input type="text" id="furn-dims" placeholder="84 x 36" autocomplete="off">
+      <button class="button primary block" id="btn-add-furniture" type="button">Add to plan</button>
+      <ul class="list" id="furniture-list"></ul>
+    </section>
+
+    <!-- 4 ─ Rooms and doors -->
+    <section class="card" id="card-rooms">
+      <h2><span class="step">4</span> Rooms &amp; doors <em>optional</em></h2>
+      <p class="hint">Trace a room to snap furniture flush against its walls.</p>
+      <div class="row">
+        <button class="button" id="btn-trace" type="button">Trace a room</button>
+        <button class="button" id="btn-door" type="button">Place a door</button>
+      </div>
+      <ul class="list" id="room-list"></ul>
+    </section>
+
+    <!-- Selection -->
+    <section class="card" id="card-selection" hidden>
+      <h2>Selected</h2>
+      <div id="selection-body"></div>
+    </section>
+
+    <!-- View -->
+    <section class="card">
+      <h2>View</h2>
+      <label class="check"><input type="checkbox" id="chk-snap" checked> Snap to walls and edges</label>
+      <label class="check"><input type="checkbox" id="chk-grid"> Show grid</label>
+      <label for="grid-size">Grid size</label>
+      <input type="text" id="grid-size" value="6" autocomplete="off">
+      <button class="button block" id="btn-fit" type="button">Fit to screen</button>
+    </section>
+
+    <!-- File -->
+    <section class="card">
+      <h2>File</h2>
+      <div class="row">
+        <button class="button" id="btn-export-json" type="button">Export JSON</button>
+        <label class="button" for="import-input">Import JSON</label>
+        <input type="file" id="import-input" accept="application/json,.json" hidden>
+      </div>
+      <button class="button block" id="btn-export-png" type="button">Export PNG</button>
+      <button class="button block danger" id="btn-reset" type="button">Start over</button>
+    </section>
+
+    <footer class="panel-foot">
+      <p><b>Drag</b> to move · <b>R</b> rotate 90° · <b>arrows</b> nudge 1&quot; (<b>⇧</b> 6&quot;) · <b>⌘D</b> duplicate · <b>⌘Z</b> undo · <b>⌥</b> suspend snapping · <b>esc</b> cancel</p>
+    </footer>
+  </aside>
+
+  <main class="stage">
+    <div class="toolbar" id="toolbar">
+      <span class="mode-label" id="mode-label">Select</span>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="canvas-wrap" id="canvas-wrap">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+        <defs id="defs"></defs>
+        <g id="layer-image"><image id="plan-image" preserveAspectRatio="none"></image></g>
+        <g id="layer-grid"></g>
+        <g id="layer-rooms"></g>
+        <g id="layer-doors"></g>
+        <g id="layer-furniture"></g>
+        <g id="layer-overlay"></g>
+      </svg>
+      <div class="empty" id="empty-state">
+        <p>Drop a floorplan image here</p>
+        <span>or use “Choose an image” in the panel</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module" src="ui.js"></script>
+</body>
+</html>

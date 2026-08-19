@@ -1,0 +1,10 @@
+{
+  "name": "floorplan",
+  "private": true,
+  "type": "module",
+  "description": "Static floorplan layout tool served at samsinsky.com/floorplan/",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "python3 -m http.server 8000 --directory .."
+  }
+}
