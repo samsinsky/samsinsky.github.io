@@ -1,0 +1,357 @@
+# Floorplan Layout Tool — Design
+
+**Date:** 2026-08-19
+**Status:** Approved, ready for implementation
+**Lives at:** `samsinsky.com/floorplan/` (unlisted — nothing links to it)
+
+**Phase 1** is the manual tool — the body of this document. **Phase 2** adds
+AI-assisted import, designed in the appendix but deliberately not built until
+phase 1 has been used on a real floorplan.
+
+## Problem
+
+Laying out a new apartment from a floorplan image. The image has printed
+dimensions; the furniture has measured dimensions. Nothing connects the two, so
+"will the sofa fit under that window" is guesswork.
+
+This tool connects them: establish the image's real-world scale once, then drag
+correctly-scaled furniture rectangles over it and look at the result.
+
+## Design principle
+
+**Show, don't judge.** The tool does not decide whether something fits. It draws
+everything at true scale and lets the eye do the rest. Overlaps are obvious
+because furniture is translucent and colors double up where pieces cross. There
+are no warnings, no validation, no red badges.
+
+## Non-goals
+
+Multi-floor plans. 3D. A furniture catalog with images. Auto-layout. Accounts or
+sync. Curved walls. Automated fit or clearance checking.
+
+Phase 1 additionally excludes everything in the appendix.
+
+## User flow
+
+1. **Upload** a floorplan image (drag-drop or file picker).
+2. **Calibrate** — drag a line across a known dimension, type its real length.
+3. **Add furniture** — name plus dimensions; drag it into place.
+4. *(Optional)* **Trace rooms and doors** for wall-snapping and swing arcs.
+
+Steps 1 and 2 are required and gate the rest. Step 4 is available any time and
+can be skipped entirely.
+
+## Coordinate system
+
+**World units are inches.** One coordinate space for everything.
+
+Calibration stores two points in *image pixel* space plus the real length
+between them. That derives:
+
+```
+inchesPerPixel = realInches / pixelDistance(p1, p2)
+```
+
+The floorplan image is then rendered at `naturalWidth * inchesPerPixel` inches
+wide. Rooms, doors, and furniture are authored directly in inches and need no
+conversion.
+
+Before calibration, `inchesPerPixel` is 1 — the world is simply image pixels.
+Nothing else can be created until calibration is set, so nothing needs
+rescaling at that moment.
+
+**Re-calibrating later** scales existing content by the ratio between the old
+and new `inchesPerPixel`, so everything stays pinned to the same features of
+the image. Room polygons, door endpoints, and furniture *positions* all scale.
+Furniture *dimensions* do not — an 84" sofa is 84" regardless of what the
+floorplan turns out to be.
+
+Zoom and pan are pure `viewBox` manipulation on the root SVG — no transform
+bookkeeping on individual elements.
+
+### Verification line
+
+In calibrate mode, after the scale is set, the user can drag additional lines
+that read out their computed real-world length. This catches a mistyped
+calibration or a floorplan whose printed dimensions disagree with each other.
+Verification lines are transient and never stored.
+
+## Data model
+
+```js
+{
+  version: 1,
+  image: { dataUrl, naturalWidth, naturalHeight } | null,
+  calibration: { p1: {x,y}, p2: {x,y}, realInches } | null,  // image px
+  rooms:     [{ id, name, points: [{x,y}, ...] }],           // inches
+  doors:     [{ id, p1: {x,y}, p2: {x,y}, hinge, swing }],   // inches
+  furniture: [{ id, name, w, d, x, y, rot, color }],         // inches
+  settings:  { gridOn, gridSize, snapOn }
+}
+```
+
+- Furniture `x, y` is the **center** of the piece; `rot` is degrees clockwise.
+- `w` is the dimension along the piece's local X axis, `d` along local Y.
+- `hinge` is `'p1' | 'p2'` — which endpoint the door pivots on.
+- `swing` is `'cw' | 'ccw'` — which side the arc sweeps to.
+- `color` is assigned by cycling a fixed palette as pieces are added.
+
+## Dimension parsing
+
+One parser handles every reasonable way to type a measurement. A bare number is
+**inches**.
+
+| Input | Inches |
+|---|---|
+| `84` | 84 |
+| `84"` | 84 |
+| `7'` | 84 |
+| `7' 6"` | 90 |
+| `7'6` | 90 |
+| `6.5'` | 78 |
+
+Pair form accepts `x` or `×` as the separator with any spacing: `84x36`,
+`84 x 36`, `7' x 3'`, `7'6" x 2'10"`.
+
+Display format is `7' 6"`, dropping the inches part when zero. Areas display as
+square feet to one decimal.
+
+## Rooms and doors (optional)
+
+**Tracing a room:** click each corner, close the loop by clicking the first
+point or pressing Enter. While tracing, if the segment from the previous point
+is within 12° of horizontal or vertical, it snaps to exact axis alignment — so
+rectangular rooms come out clean without precision clicking. Each room gets an
+editable name and displays its area in square feet.
+
+**Placing a door:** click two points. Each endpoint snaps to the nearest traced
+wall segment within 18"; with no rooms traced, the points land where clicked.
+Hinge side and swing direction are toggled after placement. Rendered as the standard architectural symbol: a leaf line plus a
+quarter arc.
+
+Doors exist purely as a visual reference. Nothing checks whether furniture
+blocks them.
+
+## Furniture
+
+**Adding:** a form with name and dimensions. A preset dropdown pre-fills
+standard sizes, which the user then edits to match their actual piece:
+
+Twin bed 39×75 · Full 54×75 · Queen 60×80 · King 76×80 · Cal King 72×84 ·
+Sofa (3-seat) 84×36 · Loveseat 60×36 · Armchair 35×35 · Coffee table 48×24 ·
+Side table 22×22 · Nightstand 24×18 · Dresser (6-drawer) 60×20 ·
+Dresser (3-drawer) 36×18 · Desk 60×30 · Office chair 26×26 ·
+Dining table (4) 48×30 · Dining table (6) 72×36 · Dining chair 18×18 ·
+TV stand 60×16 · Bookcase 32×12 · Washer/dryer 27×30 · Refrigerator 36×32 ·
+Rug 60×96 · Rug 96×120
+
+**Sidebar list:** every piece, with its dimensions. Click to select and center;
+edit dimensions in place; delete.
+
+## Interaction
+
+Mode state machine: `select` · `calibrate` · `trace-room` · `place-door`.
+Explicit toolbar buttons; Esc always returns to `select`.
+
+### Manipulating furniture
+
+| Action | Control |
+|---|---|
+| Move | Drag the piece |
+| Rotate | Drag the handle above it — 15° snaps, Shift for free rotation |
+| Rotate 90° | `R` (`Shift+R` for counter-clockwise) |
+| Nudge 1" | Arrow keys |
+| Nudge 6" | Shift + arrow keys |
+| Duplicate | `⌘D` / `Ctrl+D` — offset 6" down-right |
+| Delete | Delete or Backspace |
+| Undo / Redo | `⌘Z` / `⌘⇧Z` |
+
+### Snapping
+
+Hold Option/Alt to suspend all snapping.
+
+- **Grid** — toggleable, 6" default, origin at the image's top-left corner.
+- **Piece to piece** — edges align within 4".
+- **Piece to wall** — a furniture edge within 4" of a traced wall segment, and
+  within 8° of parallel to it, translates flush against it. Translation only;
+  the tool never rotates a piece for the user.
+
+### Navigation
+
+Wheel zooms at the cursor, clamped to 0.1×–20× of the fit-to-screen scale.
+Space-drag or middle-drag pans. On touch: one finger starting on a piece drags
+that piece, one finger starting on empty canvas pans the view, two fingers
+pinch-zoom. In `trace-room` and `place-door` modes a one-finger tap places a
+point instead. A "Fit" button resets the view.
+
+## Rendering
+
+A single SVG whose `viewBox` is in inches. Layers, bottom to top:
+
+1. Floorplan image
+2. Traced rooms — translucent fill, solid stroke
+3. Doors — leaf line and swing arc
+4. Furniture — 45% opacity fill, 2px stroke, centered label
+5. Selection outline and rotate handle
+6. Calibration and verification lines (calibrate mode only)
+
+The 45% fill is load-bearing: it is the entire overlap-detection mechanism.
+Where two pieces cross, the fills compound into a visibly darker region.
+
+## Persistence and export
+
+- **Autosave** to `localStorage` under `floorplan-planner-v1`, debounced 500ms.
+- The uploaded image is **downscaled to a 2000px long edge and re-encoded as
+  JPEG at q0.85** before storage. This keeps a typical plan under 500KB, well
+  inside the ~5MB origin quota.
+- **Export / import JSON** — full document including the image, for moving a
+  layout between laptop and phone.
+- **Export PNG** — serialize the SVG, draw to a canvas at 2×, download. Exports
+  the full plan extent, not the current viewport, so the output does not depend
+  on where the view happens to be scrolled.
+
+Undo is snapshot-based: a deep clone of state excluding the image, capped at 50
+entries.
+
+## Hosting and privacy
+
+Static files in the `samsinsky.github.io` repo at `portfolio/floorplan/`,
+served by GitHub Pages at `samsinsky.com/floorplan/`. No build step — the repo
+has none, and GitHub Pages serves native ES modules correctly.
+
+**The page is public.** Unlisted is not private: anyone with the URL can open
+it, and the repo is public so the source is browsable. `<meta name="robots"
+content="noindex">` and a `robots.txt` disallow keep it out of search results.
+
+**The floorplan image is private.** It is read directly into the browser, kept
+only in that browser's local storage, and never transmitted anywhere —
+including to GitHub. Someone who finds the URL gets an empty tool.
+
+## Code structure
+
+```
+portfolio/floorplan/
+  index.html      shell, toolbar, sidebar
+  app.css         styling — matches the main site
+  geometry.js     dimension parsing, rect corners, polygon area, snapping
+  model.js        state, undo, localStorage, JSON import/export
+  render.js       draws the SVG scene from state
+  interact.js     pointer/touch handling, mode state machine
+  ui.js           panels, forms, furniture list
+  test/geometry.test.js
+```
+
+`geometry.js` is pure functions with no DOM access — everything else may touch
+the DOM.
+
+Local development: `python3 -m http.server 8000` from the repo root, then
+`localhost:8000/floorplan/`. Opening via `file://` will not work, because
+browsers block ES module loading over that scheme.
+
+## Styling
+
+Matches the existing site so the page reads as part of it: `rgb(240, 233, 226)`
+paper background, Space Grotesk for headings and controls, DM Sans for body,
+white cards at 14px radius with `oklch(90% 0.01 240)` borders, the same
+`fadeUp` entrance animation. Fonts load from the same Google Fonts URL the
+homepage already uses.
+
+The canvas area itself sits on white for contrast against the floorplan image.
+
+## Testing
+
+`node --test` over `test/geometry.test.js`, no dependencies. Coverage focuses
+where the bugs will actually be:
+
+- Dimension parsing across every accepted format, including malformed input
+- Inch formatting round-trips
+- Polygon area
+- Rotated rectangle corner computation
+- Grid snapping and parallel-wall detection
+
+Interaction and rendering are verified by hand in the browser.
+
+
+---
+
+# Appendix — Phase 2: AI-assisted import
+
+Not built in phase 1. Recorded here so phase 1 does not paint it into a corner.
+
+## The governing constraint
+
+Vision models read text reliably and report pixel coordinates unreliably. Every
+decision below follows from that split: **the model supplies numbers, the human
+supplies geometry.**
+
+The example floorplan that motivated this feature demonstrates why. Its room
+labels — `KITCHEN 9'1 x 7'10`, `LIVING / DINING 16'3 x 13'8`, `FOYER 8'1 x
+5'3`, `BEDROOM 14'5 x 10'9` — are crisp, high-contrast, and trivially readable.
+But the same image also carries `390`, `480`, and `330` in blue, which are
+window or line numbers, not measurements. A model that silently adopts `330` as
+a wall length produces a plan wrong by a factor of three, and no downstream
+check would catch it. A pick-list the human confirms makes that failure
+impossible at a cost of about two seconds.
+
+Note also that room labels are **nominal**. In the example, the living/dining
+room is L-shaped and the bedroom has a notch, yet each carries a single
+`W × D`. Those numbers describe a span, not a rectangle — so the human must
+choose which span the calibration line crosses.
+
+## Floorplan import
+
+On upload, optionally send the image to a vision model and ask for the labels
+it can find:
+
+```json
+{
+  "rooms": [{ "name": "BEDROOM", "width": "14'5", "depth": "10'9" }],
+  "fixtures": ["W/D", "DW", "MIC", "R", "CL", "CL", "tub", "toilet"]
+}
+```
+
+Coordinates are never requested. The results drive two things:
+
+1. **Calibration becomes a pick, not a transcription.** Drag the line across
+   the bedroom, then choose "Bedroom — 14'5" from a dropdown instead of typing.
+2. **Tracing becomes self-checking.** Trace a room and the tool compares the
+   traced extent against the stated label: *"traced 14'2 × 10'11 — label says
+   14'5 × 10'9."* Agreement confirms the calibration; an 8% discrepancy is
+   visible immediately. This needs no AI pointing at anything, and it is the
+   main safety net for the whole document.
+
+Room names also pre-populate the name field when tracing.
+
+## Furniture import
+
+More reliable than floorplan import, because product pages state dimensions as
+text in a spec table. Two input paths, one extraction schema:
+
+- **Paste text** — copy the spec block from a product page. No vision call
+  needed; cheaper and instant. This is the default.
+- **Upload an image** — a screenshot or photo of a spec sheet. Vision call.
+
+Both return `{ name, width, depth, height }`, land in the same add-furniture
+form as manual entry, and are editable before committing. Height is captured
+but unused in phase 1.
+
+## API key handling
+
+The key is **pasted by the user at runtime** into a settings field and stored in
+that browser's local storage. It is never committed, never present in the
+served source, and is transmitted only to the model provider's API.
+
+This is the correct choice specifically *because* the page is public. A
+serverless proxy would hide the key from the browser, but would let anyone who
+found the URL spend the key's credits. Browser-only storage means a stranger
+who opens the page sees an empty field, and the tool still works manually.
+
+Consequences to honor in implementation:
+
+- Every AI feature is **optional and additive**. With no key set, the tool
+  behaves exactly as phase 1 — no broken buttons, no nag screens.
+- The key never enters application state that gets serialized. Exported JSON,
+  autosaved documents, and undo snapshots must all exclude it.
+- Failed or refused API calls degrade to manual entry rather than blocking.
+- The model identifier is configurable rather than hardcoded, and must be
+  confirmed current at implementation time.
