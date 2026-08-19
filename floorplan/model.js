@@ -221,15 +221,18 @@ export class Store {
   }
 
   // ── Undo ──
-  // The image is excluded from snapshots: it is large, and it never changes as
-  // a result of an undoable action.
+  // Geometry is deep-copied; the image rides along by reference, since its
+  // data URL is never mutated in place. That costs a pointer per entry and
+  // makes importing a layout undoable like anything else.
   snapshot() {
     const { image, ...rest } = this.doc;
-    return JSON.parse(JSON.stringify(rest));
+    const copy = JSON.parse(JSON.stringify(rest));
+    copy.image = image;
+    return copy;
   }
 
   restore(snapshot) {
-    this.doc = { ...snapshot, image: this.doc.image };
+    this.doc = { ...snapshot };
   }
 
   pushUndo() {
@@ -315,17 +318,22 @@ export class Store {
     return JSON.stringify(this.doc, null, 2);
   }
 
+  // Importing replaces everything, so it goes through the undo stack rather
+  // than clearing it — dropping the wrong file is one keystroke from recovery.
   fromJSON(text) {
     const parsed = JSON.parse(text);
     if (!parsed || typeof parsed !== 'object' || parsed.version !== 1) {
       throw new Error('That file is not a floorplan layout.');
     }
+
+    const hadWork = Boolean(this.doc.image || this.doc.furniture.length || this.doc.rooms.length);
+    if (hadWork) this.pushUndo();
+
     this.doc = { ...emptyDoc(), ...parsed };
-    this.undoStack.length = 0;
-    this.redoStack.length = 0;
     this.ui.selection = null;
     this.ui.view = null;
     this.scheduleSave();
     this.emit();
+    return hadWork;
   }
 }

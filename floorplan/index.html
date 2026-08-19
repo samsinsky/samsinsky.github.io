@@ -23,9 +23,12 @@
     <!-- 1 ─ Image -->
     <section class="card" id="card-image">
       <h2><span class="step">1</span> Floorplan image</h2>
-      <label class="button block" for="file-input">Choose an image…</label>
-      <input type="file" id="file-input" accept="image/*" hidden>
-      <p class="hint">Or drop one onto the canvas. It stays in this browser — it is never uploaded.</p>
+      <label class="button block" for="file-input">Choose a file…</label>
+      <input type="file" id="file-input" accept="image/*,application/json,.json" hidden>
+      <p class="hint">A floorplan image to start fresh, or a saved
+        <code>.json</code> layout to pick up where you left off. Either one can
+        be dropped straight onto the canvas. Nothing is uploaded — it stays in
+        this browser.</p>
     </section>
 
     <!-- 2 ─ Scale -->
@@ -151,7 +154,7 @@
       </svg>
       <div class="empty" id="empty-state">
         <p>Drop a floorplan image here</p>
-        <span>or use “Choose an image” in the panel</span>
+        <span>or a saved <code>.json</code> layout to carry on from</span>
       </div>
     </div>
   </main>

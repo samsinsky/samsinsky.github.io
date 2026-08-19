@@ -33,7 +33,11 @@ Phase 1 additionally excludes everything in the appendix.
 
 ## User flow
 
-1. **Upload** a floorplan image (drag-drop or file picker).
+1. **Upload** a floorplan image (drag-drop or file picker) — *or* a saved
+   `.json` layout, which skips straight to step 4 with everything restored.
+   Step 1 sniffs the file rather than making the user find the right control:
+   the saved layout is the more valuable of the two files, so it belongs
+   wherever the image is accepted.
 2. **Calibrate** — drag a line across a known dimension, type its real length.
 3. **Add furniture** — name plus dimensions; drag it into place.
 4. *(Optional)* **Trace rooms and doors** for wall-snapping and swing arcs.
@@ -274,7 +278,13 @@ silently — the worst possible failure for a step-gated flow.
   JPEG at q0.85** before storage. This keeps a typical plan under 500KB, well
   inside the ~5MB origin quota.
 - **Export / import JSON** — full document including the image, for moving a
-  layout between laptop and phone.
+  layout between laptop and phone. Verified lossless: export, wipe, re-import,
+  export again, and the two files are byte-identical.
+- **Importing is undoable.** It replaces the whole document, so it pushes onto
+  the undo stack instead of clearing it, and says so. Dropping the wrong file
+  is one ⌘Z from recovery. This is why undo snapshots carry the image by
+  reference — a pointer per entry buys back the one operation that can destroy
+  a traced plan.
 - **Export PNG** — serialize the SVG, draw to a canvas at 2×, download. Exports
   the full plan extent, not the current viewport, so the output does not depend
   on where the view happens to be scrolled.

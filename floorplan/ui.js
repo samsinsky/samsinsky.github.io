@@ -764,6 +764,26 @@ function renderPanel() {
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 
+async function handleLayoutFile(file) {
+  try {
+    const replaced = store.fromJSON(await file.text());
+    fitView(store, refs.svg);
+    store.setStatus(replaced
+      ? 'Layout imported, replacing what was here. Press ⌘Z to put it back.'
+      : 'Layout imported — picking up where you left off.');
+  } catch (err) {
+    store.setStatus(err.message || 'Could not read that layout file.');
+  }
+}
+
+// Step 1 accepts either kind of file: an image to start from, or a saved
+// layout to carry on from.
+function handleIncomingFile(file) {
+  if (!file) return;
+  const isLayout = file.type === 'application/json' || /\.json$/i.test(file.name);
+  return isLayout ? handleLayoutFile(file) : handleImageFile(file);
+}
+
 async function handleImageFile(file) {
   try {
     const image = await readImageFile(file);
@@ -942,8 +962,8 @@ function wire() {
 
   $('file-input').addEventListener('change', (e) => {
     const file = e.target.files?.[0];
-    if (file) handleImageFile(file);
     e.target.value = '';
+    handleIncomingFile(file);
   });
 
   const wrap = $('canvas-wrap');
@@ -957,8 +977,7 @@ function wire() {
   wrap.addEventListener('drop', (e) => {
     e.preventDefault();
     wrap.dataset.dragover = 'false';
-    const file = e.dataTransfer?.files?.[0];
-    if (file) handleImageFile(file);
+    handleIncomingFile(e.dataTransfer?.files?.[0]);
   });
 
   $('btn-calibrate').addEventListener('click', () => setMode('calibrate', { toggle: true }));
@@ -1015,17 +1034,10 @@ function wire() {
     download(new Blob([store.toJSON()], { type: 'application/json' }), 'floorplan-layout.json');
   });
 
-  $('import-input').addEventListener('change', async (e) => {
+  $('import-input').addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
-    try {
-      store.fromJSON(await file.text());
-      fitView(store, refs.svg);
-      store.setStatus('Layout imported.');
-    } catch (err) {
-      store.setStatus(err.message || 'Could not read that layout file.');
-    }
+    if (file) handleLayoutFile(file);
   });
 
   $('btn-export-png').addEventListener('click', exportPng);

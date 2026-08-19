@@ -17,7 +17,9 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 
 ## Using it
 
-1. **Upload** a floorplan image — drop it on the canvas or use the panel.
+1. **Upload** a floorplan image — drop it on the canvas or use the panel. Or
+   drop a saved `.json` layout instead, and carry on exactly where you left
+   off. Importing over existing work is undoable with `⌘Z`.
 2. **Set the scale** — drag a line across a wall whose real length you know and
    type that length. Everything downstream depends on this one measurement, so
    pick a long wall with a clearly printed dimension.
