@@ -153,15 +153,74 @@ function renderGating() {
   }
 }
 
+// The furniture array is the paint order: index 0 is drawn first, so it sits
+// at the bottom. The list shows the reverse, topmost first, the way every
+// drawing tool does — hence the index flipping here and nowhere else.
+function restack(fromDisplay, toDisplay) {
+  if (fromDisplay === toDisplay) return;
+  store.update((doc) => {
+    const top = [...doc.furniture].reverse();
+    const [moved] = top.splice(fromDisplay, 1);
+    top.splice(toDisplay, 0, moved);
+    doc.furniture = top.reverse();
+  });
+}
+
+function sendTo(id, edge) {
+  store.update((doc) => {
+    const from = doc.furniture.findIndex((f) => f.id === id);
+    if (from < 0) return;
+    const [moved] = doc.furniture.splice(from, 1);
+    if (edge === 'back') doc.furniture.unshift(moved);
+    else doc.furniture.push(moved);
+  });
+}
+
 function renderFurnitureList() {
   const list = $('furniture-list');
   list.textContent = '';
+  $('stack-hint').hidden = store.doc.furniture.length < 2;
 
-  for (const piece of store.doc.furniture) {
+  const topFirst = [...store.doc.furniture].reverse();
+
+  topFirst.forEach((piece, displayIndex) => {
     const li = document.createElement('li');
     li.setAttribute('aria-selected', String(
       store.ui.selection?.kind === 'furniture' && store.ui.selection.id === piece.id,
     ));
+    li.draggable = true;
+    li.dataset.displayIndex = String(displayIndex);
+
+    li.addEventListener('dragstart', (e) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(displayIndex));
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => li.classList.remove('dragging'));
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const below = e.offsetY > li.offsetHeight / 2;
+      li.classList.toggle('drop-below', below);
+      li.classList.toggle('drop-above', !below);
+    });
+    li.addEventListener('dragleave', () => li.classList.remove('drop-above', 'drop-below'));
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      li.classList.remove('drop-above', 'drop-below');
+      const from = Number(e.dataTransfer.getData('text/plain'));
+      if (!Number.isInteger(from)) return;
+      let to = displayIndex;
+      if (e.offsetY > li.offsetHeight / 2) to += 1;
+      if (from < to) to -= 1;
+      restack(from, to);
+    });
+
+    const grip = document.createElement('span');
+    grip.className = 'grip';
+    grip.textContent = '⠿';
+    grip.setAttribute('aria-hidden', 'true');
+    li.appendChild(grip);
 
     const swatch = document.createElement('span');
     swatch.className = 'swatch';
@@ -194,7 +253,7 @@ function renderFurnitureList() {
       });
     });
     list.appendChild(li);
-  }
+  });
 }
 
 function renderRoomList() {
@@ -437,6 +496,14 @@ function renderSelection() {
       lastSelectionKey = null;
       renderSelection();
     }));
+
+    const stackRow = document.createElement('div');
+    stackRow.className = 'row';
+    stackRow.append(
+      button('Send to back', () => sendTo(piece.id, 'back')),
+      button('Bring to front', () => sendTo(piece.id, 'front')),
+    );
+    body.appendChild(stackRow);
 
     const row = document.createElement('div');
     row.className = 'row';

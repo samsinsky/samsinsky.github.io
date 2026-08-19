@@ -39,6 +39,7 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 | | |
 |---|---|
 | Recolour | select the piece, pick a swatch in the panel |
+| Restack | drag a row in the list, or *Send to back* / *Bring to front* |
 | Move | drag |
 | Rotate | drag the handle · `R` for 90° · `⇧R` for −90° |
 | Nudge | arrows (1″) · `⇧` + arrows (6″) |

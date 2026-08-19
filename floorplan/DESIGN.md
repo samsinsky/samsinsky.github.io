@@ -200,8 +200,15 @@ for anything else. Colour is the only thing distinguishing two similar
 rectangles at a glance, so it has to be editable rather than whatever the cycle
 happened to hand out.
 
+**Stacking order** is the furniture array itself: index 0 paints first and
+therefore sits at the bottom. The sidebar list shows the reverse — topmost
+first, as every drawing tool does — and the index flip lives in exactly one
+place. Drag a row to restack, or use *Send to back* / *Bring to front* in the
+selection panel, since dragging to the end of a long list to bury a rug is a
+chore. Restacking goes through the normal undo stack.
+
 **Sidebar list:** every piece, with its dimensions and colour swatch. Click to
-select and center; edit dimensions in place; delete.
+select and center; edit dimensions in place; delete; drag to restack.
 
 ## Interaction
 
