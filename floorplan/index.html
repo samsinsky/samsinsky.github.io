@@ -59,16 +59,26 @@
         <option value="rect">Rectangle</option>
         <option value="L">L-shape</option>
       </select>
-      <label for="furn-dims" id="furn-dims-label">Width × depth</label>
-      <input type="text" id="furn-dims" placeholder="84 x 36" autocomplete="off">
+      <div id="rect-fields">
+        <label for="furn-dims">Width × depth</label>
+        <input type="text" id="furn-dims" placeholder="84 x 36" autocomplete="off">
+      </div>
       <div id="l-fields" hidden>
         <svg id="l-preview" class="l-preview" xmlns="http://www.w3.org/2000/svg"></svg>
-        <label for="furn-arm">Thickness of the long arm</label>
-        <input type="text" id="furn-arm" placeholder="36" autocomplete="off">
-        <label for="furn-leg">Thickness of the short arm</label>
-        <input type="text" id="furn-leg" placeholder="36" autocomplete="off">
-        <p class="hint">How deep the seat is, not how long the sofa is — usually
-          36&quot;–40&quot; on a sectional. Watch the diagram.</p>
+        <p class="footprint" id="l-footprint"></p>
+        <label for="furn-ldims">Total width × depth</label>
+        <input type="text" id="furn-ldims" placeholder="106 x 84" autocomplete="off">
+        <label for="furn-seat">Seat depth</label>
+        <input type="text" id="furn-seat" placeholder="36" autocomplete="off">
+        <label class="check">
+          <input type="checkbox" id="furn-split"> Chaise is a different width
+        </label>
+        <div id="chaise-field" hidden>
+          <label for="furn-chaise">Chaise width</label>
+          <input type="text" id="furn-chaise" placeholder="36" autocomplete="off">
+        </div>
+        <p class="hint">Straight off the spec sheet: the two overall numbers,
+          then how deep the seat is.</p>
         <label>Corner</label>
         <div class="corner-picker" id="furn-corner"></div>
       </div>

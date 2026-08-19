@@ -134,20 +134,28 @@ blocks them.
 
 ## Furniture
 
-**Shape:** rectangle or L. An L is its bounding box minus a notch, described by
-four numbers plus a corner: overall `W × D`, the *thickness of the long arm*
-(running along W), the *thickness of the short arm* (running along D), and
-which corner the elbow sits at — picked from four glyphs, `┌ ┐ └ ┘`, each drawn
-as the elbow it produces.
+**Shape:** rectangle or L. Internally an L is its bounding box minus a notch —
+`w`, `d`, `armDepth`, `legWidth`, `corner`. The *form* does not ask for it that
+way.
 
-**A live preview is not optional here.** The arm thicknesses are a seat depth
-(~36"), but every name for them reads plausibly as the *length* of the sofa —
-the first user of this feature entered their overall depth and got a silent
-refusal. So the panel draws the shape as you type, annotated with all four
-dimensions, and shows a dashed red outline captioned "arms fill the footprint"
-when the numbers leave no L. Since both arms of a sectional are almost always
-the same seat depth, typing the first mirrors it into the second until the user
-edits the second directly.
+**The form asks for what the spec sheet prints.** A sectional's product page
+gives a total width, a total depth, and a seat depth. So the form asks for
+exactly those: `Total width × depth`, then `Seat depth`. Both arms share the
+seat depth, with a `Chaise is a different width` checkbox revealing the fourth
+number in the rare case they differ. Two fields for the common case.
+
+This took three attempts, and the failures are worth recording. Asking for the
+footprint plus two *arm thicknesses* produced a field called "long side depth",
+which a user read as the length of the sofa and filled with their overall
+depth — silently refused. Re-modelling as two arms, each `length × depth`, was
+internally cleaner but forced the user to derive numbers their spec sheet
+already gave them. **The rule that survived: ask for the numbers the user is
+reading off, never numbers they have to compute.**
+
+A live preview backs this up regardless of labelling: the panel draws the shape
+as you type, annotated with every dimension, and shows a dashed red outline
+when the numbers leave no L. Picking which corner the elbow sits at uses four
+glyphs, `┌ ┐ └ ┘`, each drawn as the elbow it produces.
 
 An L is a single piece: it drags, rotates, snaps and exports as one. Because
 snapping consumes edge lists rather than rectangles, an L snaps by its true

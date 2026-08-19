@@ -201,6 +201,17 @@ input[type="text"]:focus, select:focus {
   border-radius: 10px;
 }
 
+.footprint {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: -2px 0 4px;
+  min-height: 14px;
+}
+
 /* Four elbow glyphs laid out as the corners they represent. */
 .corner-picker {
   display: grid;

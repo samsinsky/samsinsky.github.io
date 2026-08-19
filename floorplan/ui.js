@@ -42,7 +42,6 @@ const refs = {
 const store = new Store();
 let lastSelectionKey = null;
 let draftCorner = 'ne';   // elbow chosen in the add-furniture form
-let legTouched = false;   // has the user set the short arm independently?
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -316,34 +315,54 @@ function renderSelection() {
 
     const isL = piece.shape === 'L';
 
-    body.appendChild(field(
-      isL ? 'Overall width × depth' : 'Width × depth',
-      `${formatInches(piece.w)} × ${formatInches(piece.d)}`,
-      (value, input) => {
-        const parsed = parseDimensionPair(value);
-        if (!parsed) {
-          store.setStatus(`Could not read “${value}”. Try 84 x 36 or 7' x 3'.`);
-          input.value = `${formatInches(piece.w)} × ${formatInches(piece.d)}`;
-          return;
-        }
-        store.update((doc) => {
-          const t = doc.furniture.find((f) => f.id === piece.id);
-          if (!t) return;
-          t.w = parsed.w;
-          t.d = parsed.d;
-          // Keep the arms inside the new footprint rather than letting the
-          // shape collapse silently.
-          if (t.shape === 'L') {
-            t.armDepth = Math.min(t.armDepth, t.d - 1);
-            t.legWidth = Math.min(t.legWidth, t.w - 1);
+    if (!isL) {
+      body.appendChild(field(
+        'Width × depth',
+        `${formatInches(piece.w)} × ${formatInches(piece.d)}`,
+        (value, input) => {
+          const parsed = parseDimensionPair(value);
+          if (!parsed) {
+            store.setStatus(`Could not read “${value}”. Try 84 x 36 or 7' x 3'.`);
+            input.value = `${formatInches(piece.w)} × ${formatInches(piece.d)}`;
+            return;
           }
-        });
-        store.setStatus('');
-      },
-    ));
+          store.update((doc) => {
+            const t = doc.furniture.find((f) => f.id === piece.id);
+            if (t) {
+              t.w = parsed.w;
+              t.d = parsed.d;
+            }
+          });
+          store.setStatus('');
+        },
+      ));
+    }
 
     if (isL) {
-      const armField = (label, key, limitKey) => field(
+      body.appendChild(field(
+        'Total width × depth',
+        `${formatInches(piece.w)} × ${formatInches(piece.d)}`,
+        (value, input) => {
+          const parsed = parseDimensionPair(value);
+          if (!parsed) {
+            store.setStatus(`Could not read “${value}”. Try 106 x 84.`);
+            input.value = `${formatInches(piece.w)} × ${formatInches(piece.d)}`;
+            return;
+          }
+          store.update((doc) => {
+            const t = doc.furniture.find((f) => f.id === piece.id);
+            if (!t) return;
+            t.w = parsed.w;
+            t.d = parsed.d;
+            // Keep the arms inside the new footprint rather than collapsing.
+            t.armDepth = Math.min(t.armDepth, t.d - 1);
+            t.legWidth = Math.min(t.legWidth, t.w - 1);
+          });
+          store.setStatus('');
+        },
+      ));
+
+      const thickness = (label, key, limitKey) => field(
         label,
         formatInches(piece[key]),
         (value, input) => {
@@ -362,8 +381,8 @@ function renderSelection() {
         },
       );
 
-      body.appendChild(armField('Thickness of the long arm', 'armDepth', 'd'));
-      body.appendChild(armField('Thickness of the short arm', 'legWidth', 'w'));
+      body.appendChild(thickness('Seat depth', 'armDepth', 'd'));
+      body.appendChild(thickness('Chaise width', 'legWidth', 'w'));
 
       const cornerLabel = document.createElement('label');
       cornerLabel.textContent = 'Corner';
@@ -482,28 +501,51 @@ function cornerPicker(container, current, onPick) {
   return container;
 }
 
+// A sectional's spec sheet gives an overall width, an overall depth and a seat
+// depth, so that is exactly what the form asks for. Both arms share the seat
+// depth unless the user says the chaise differs, which is rare.
+function readArms() {
+  const overall = parseDimensionPair($('furn-ldims').value);
+  if (!overall) return null;
+
+  const seat = parseInches($('furn-seat').value);
+  if (seat === null || seat <= 0) return null;
+
+  const chaise = $('furn-split').checked ? parseInches($('furn-chaise').value) : seat;
+  if (chaise === null || chaise <= 0) return null;
+
+  return {
+    shape: 'L',
+    w: overall.w,
+    d: overall.d,
+    armDepth: seat,     // thickness of the run along the width
+    legWidth: chaise,   // thickness of the run along the depth
+  };
+}
+
 // Reads the add-furniture form into a piece shape, or an error to show.
 function readShapeForm() {
-  const parsed = parseDimensionPair($('furn-dims').value);
-  if (!parsed) {
-    return { error: 'Enter dimensions as width × depth — 84 x 36, or 7\' x 3\'.' };
-  }
   if ($('furn-shape').value !== 'L') {
+    const parsed = parseDimensionPair($('furn-dims').value);
+    if (!parsed) {
+      return { error: 'Enter dimensions as width × depth — 84 x 36, or 7\' x 3\'.' };
+    }
     return { shape: 'rect', w: parsed.w, d: parsed.d };
   }
 
-  const armDepth = parseInches($('furn-arm').value);
-  const legWidth = parseInches($('furn-leg').value);
-  if (armDepth === null || legWidth === null || armDepth <= 0 || legWidth <= 0) {
-    return { error: 'An L needs a thickness for each arm — the seat depth, usually around 36".' };
+  const arms = readArms();
+  if (!arms) {
+    return { error: 'Give a total width × depth and a seat depth — for a sectional, something like 106 x 84 and 36.' };
   }
-  if (armDepth >= parsed.d || legWidth >= parsed.w) {
-    return {
-      error: `Those arms fill the whole footprint, leaving no L. The long arm must be thinner than ${formatInches(parsed.d)} and the short arm thinner than ${formatInches(parsed.w)} — these are seat depths, not the length of the sofa.`,
-    };
+  if (arms.armDepth >= arms.d) {
+    return { error: `A seat depth of ${formatInches(arms.armDepth)} fills the whole ${formatInches(arms.d)} depth, leaving a plain rectangle.` };
   }
-  return { shape: 'L', w: parsed.w, d: parsed.d, armDepth, legWidth, corner: draftCorner };
+  if (arms.legWidth >= arms.w) {
+    return { error: `A chaise width of ${formatInches(arms.legWidth)} fills the whole ${formatInches(arms.w)} width, leaving a plain rectangle.` };
+  }
+  return { ...arms, corner: draftCorner };
 }
+
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -520,20 +562,21 @@ function renderLPreview() {
   const svg = $('l-preview');
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-  const parsed = parseDimensionPair($('furn-dims').value);
-  if (!parsed) {
-    svg.setAttribute('viewBox', '0 0 100 40');
+  const arms = readArms();
+  if (!arms) {
+    $('l-footprint').textContent = '';
+    svg.setAttribute('viewBox', '0 0 200 70');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     svg.appendChild(svgEl('text', {
-      x: 50, y: 23, 'text-anchor': 'middle', 'font-size': 7,
-      fill: 'oklch(60% 0.015 240)', 'font-family': 'system-ui, sans-serif',
-    }, 'Enter an overall size to preview'));
+      x: 100, y: 38, 'text-anchor': 'middle', 'font-size': 11,
+      fill: 'oklch(62% 0.015 240)', 'font-family': 'system-ui, sans-serif',
+    }, 'Enter a size and seat depth'));
     return;
   }
 
-  const { w, d } = parsed;
-  const arm = parseInches($('furn-arm').value);
-  const leg = parseInches($('furn-leg').value);
-  const degenerate = !(arm > 0) || !(leg > 0) || arm >= d || leg >= w;
+  const { w, d, armDepth: arm, legWidth: leg } = arms;
+  const degenerate = arm >= d || leg >= w;
+  $('l-footprint').textContent = degenerate ? '' : 'This is the footprint you will get';
 
   const pad = Math.max(w, d) * 0.22;
   svg.setAttribute('viewBox', `${-w / 2 - pad} ${-d / 2 - pad} ${w + pad * 2} ${d + pad * 2}`);
@@ -566,7 +609,7 @@ function renderLPreview() {
   });
 
   if (degenerate) {
-    label(0, -d / 2 - pad * 0.62, 'arms fill the footprint', { fill: accent, 'font-size': fs * 0.85 });
+    label(0, -d / 2 - pad * 0.62, 'seat depth fills the whole footprint', { fill: accent, 'font-size': fs * 0.8 });
     return;
   }
 
@@ -580,7 +623,8 @@ function renderLPreview() {
 function syncShapeForm() {
   const isL = $('furn-shape').value === 'L';
   $('l-fields').hidden = !isL;
-  $('furn-dims-label').textContent = isL ? 'Overall width × depth' : 'Width × depth';
+  $('rect-fields').hidden = isL;
+  $('chaise-field').hidden = !$('furn-split').checked;
   if (isL) renderLPreview();
 }
 
@@ -694,10 +738,12 @@ function addFurniture() {
 
   $('furn-name').value = '';
   $('furn-dims').value = '';
-  $('furn-arm').value = '';
-  $('furn-leg').value = '';
+  $('furn-ldims').value = '';
+  $('furn-seat').value = '';
+  $('furn-chaise').value = '';
+  $('furn-split').checked = false;
+  $('chaise-field').hidden = true;
   $('preset').value = '';
-  legTouched = false;
   renderLPreview();
   store.setStatus(`Added ${name}. Drag it into place.`);
 }
@@ -763,9 +809,17 @@ function wire() {
     $('furn-name').value = preset.name;
     $('furn-dims').value = `${preset.w} x ${preset.d}`;
     $('furn-shape').value = preset.shape === 'L' ? 'L' : 'rect';
-    $('furn-arm').value = preset.armDepth ? String(preset.armDepth) : '';
-    $('furn-leg').value = preset.legWidth ? String(preset.legWidth) : '';
-    legTouched = Boolean(preset.legWidth && preset.legWidth !== preset.armDepth);
+    if (preset.shape === 'L') {
+      $('furn-ldims').value = `${preset.w} x ${preset.d}`;
+      $('furn-seat').value = String(preset.armDepth);
+      $('furn-split').checked = preset.legWidth !== preset.armDepth;
+      $('furn-chaise').value = String(preset.legWidth);
+    } else {
+      $('furn-ldims').value = '';
+      $('furn-seat').value = '';
+      $('furn-split').checked = false;
+      $('furn-chaise').value = '';
+    }
     syncShapeForm();
   });
 
@@ -777,15 +831,16 @@ function wire() {
 
   // Both arms of a sectional are almost always the same seat depth, so mirror
   // the first into the second until the user says otherwise.
-  $('furn-arm').addEventListener('input', () => {
-    if (!legTouched) $('furn-leg').value = $('furn-arm').value;
-  });
-  $('furn-leg').addEventListener('input', () => {
-    legTouched = true;
-  });
-  for (const id of ['furn-dims', 'furn-arm', 'furn-leg']) {
+  for (const id of ['furn-ldims', 'furn-seat', 'furn-chaise']) {
     $(id).addEventListener('input', renderLPreview);
   }
+  $('furn-split').addEventListener('change', () => {
+    $('chaise-field').hidden = !$('furn-split').checked;
+    if ($('furn-split').checked && !$('furn-chaise').value) {
+      $('furn-chaise').value = $('furn-seat').value;
+    }
+    renderLPreview();
+  });
 
   syncShapeForm();
 
@@ -828,7 +883,7 @@ function wire() {
   });
 
   $('btn-add-furniture').addEventListener('click', addFurniture);
-  for (const id of ['furn-dims', 'furn-arm', 'furn-leg']) {
+  for (const id of ['furn-dims', 'furn-ldims', 'furn-seat', 'furn-chaise']) {
     $(id).addEventListener('input', () => setFieldError('furniture-error', ''));
   }
   $('real-length').addEventListener('input', () => setFieldError('scale-error', ''));

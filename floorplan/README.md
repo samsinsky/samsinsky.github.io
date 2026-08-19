@@ -22,11 +22,13 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
    type that length. Everything downstream depends on this one measurement, so
    pick a long wall with a clearly printed dimension.
 3. **Add furniture** — name plus `84 x 36`, `7' x 3'`, or `7'6" x 2'10"`. A
-   preset dropdown fills in standard sizes to edit from. Pick **L-shape** for a
-   sectional or corner desk: give the overall footprint, the thickness of each
-   arm, and which corner the elbow sits at. The arm thickness is the *seat
-   depth* — around 36", not the length of the sofa. A live diagram shows what
-   your numbers build.
+   preset dropdown fills in standard sizes to edit from.
+
+   Pick **L-shape** for a sectional or corner desk and type what the product
+   page prints: total width × depth, then the seat depth. A 106" sectional 84"
+   deep with a 36" seat is `106 x 84` and `36`. Tick *chaise is a different
+   width* only if the two arms genuinely differ. A live diagram shows the shape
+   as you type, so you can see it is right before adding it.
 4. *(Optional)* **Trace rooms and doors** — makes furniture snap flush to walls
    and draws door swing arcs.
 
