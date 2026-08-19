@@ -2,7 +2,8 @@
 // nothing here converts units — it only decides what to draw.
 
 import {
-  rectCorners,
+  pieceLocal,
+  pieceLabelAnchor,
   formatInches,
   formatArea,
   dist,
@@ -239,23 +240,24 @@ function paintFurniture(store, refs, wpp) {
     // 45% fill is the entire overlap-detection mechanism: where two pieces
     // cross, the fills compound into a visibly darker region.
     g.appendChild(
-      el('rect', {
-        x: -piece.w / 2,
-        y: -piece.d / 2,
-        width: piece.w,
-        height: piece.d,
-        rx: Math.min(2, piece.w / 20),
+      el('polygon', {
+        points: pointsAttr(pieceLocal(piece)),
         fill: piece.color,
         'fill-opacity': 0.45,
         stroke: piece.color,
         'stroke-width': selected ? 3 : 2,
+        'stroke-linejoin': 'round',
         'vector-effect': 'non-scaling-stroke',
       }),
     );
 
     // Counter-rotate so a piece turned 180 degrees does not get upside-down
-    // text.
-    const labelGroup = el('g', { transform: `rotate(${-piece.rot})`, 'pointer-events': 'none' });
+    // text, and anchor to solid footprint so an L's label misses the notch.
+    const anchor = pieceLabelAnchor(piece);
+    const labelGroup = el('g', {
+      transform: `translate(${anchor.x} ${anchor.y}) rotate(${-piece.rot})`,
+      'pointer-events': 'none',
+    });
     const name = el('text', {
       x: 0,
       y: 0,

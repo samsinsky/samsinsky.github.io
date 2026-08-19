@@ -131,25 +131,86 @@ export function normalizeAngle(deg) {
   return ((deg % 360) + 360) % 360;
 }
 
-// ── Rectangles ──────────────────────────────────────────────────────────────
-// A piece is a centre (x, y), size (w, d) and clockwise rotation in degrees.
+// ── Pieces ──────────────────────────────────────────────────────────────────
+// A piece is a centre (x, y), a bounding size (w, d) and a clockwise rotation
+// in degrees. Its footprint is a polygon in local coordinates centred on the
+// origin, produced by the shape functions below.
 
-export function rectCorners({ x, y, w, d, rot = 0 }) {
-  const hw = w / 2;
-  const hd = d / 2;
+function placeLocal(local, x, y, rot) {
   const r = (rot * Math.PI) / 180;
   const cos = Math.cos(r);
   const sin = Math.sin(r);
-
-  return [
-    [-hw, -hd],
-    [hw, -hd],
-    [hw, hd],
-    [-hw, hd],
-  ].map(([px, py]) => ({
-    x: x + px * cos - py * sin,
-    y: y + px * sin + py * cos,
+  return local.map((p) => ({
+    x: x + p.x * cos - p.y * sin,
+    y: y + p.x * sin + p.y * cos,
   }));
+}
+
+export function rectLocal(w, d) {
+  const hw = w / 2;
+  const hd = d / 2;
+  return [
+    { x: -hw, y: -hd },
+    { x: hw, y: -hd },
+    { x: hw, y: hd },
+    { x: -hw, y: hd },
+  ];
+}
+
+// An L is the bounding box minus a notch. `corner` names the elbow — where the
+// two arms meet — matching the ┌ ┐ └ ┘ glyphs in the UI. `armDepth` is the
+// thickness of the arm running along w, `legWidth` the thickness of the arm
+// running along d.
+export function lShapeLocal(w, d, armDepth, legWidth, corner = 'ne') {
+  const hw = w / 2;
+  const hd = d / 2;
+
+  // Degenerate parameters collapse to the bounding rectangle rather than
+  // producing a self-crossing polygon.
+  const arm = armDepth;
+  const leg = legWidth;
+  if (!(arm > 0) || !(leg > 0) || arm >= d || leg >= w) return rectLocal(w, d);
+
+  // Built with the elbow at north-east, then mirrored into the other three.
+  const base = [
+    { x: -hw, y: -hd },
+    { x: hw, y: -hd },
+    { x: hw, y: hd },
+    { x: hw - leg, y: hd },
+    { x: hw - leg, y: -hd + arm },
+    { x: -hw, y: -hd + arm },
+  ];
+
+  const flipX = corner === 'nw' || corner === 'sw';
+  const flipY = corner === 'se' || corner === 'sw';
+  return base.map((p) => ({ x: flipX ? -p.x : p.x, y: flipY ? -p.y : p.y }));
+}
+
+export function pieceLocal(piece) {
+  if (piece.shape === 'L') {
+    return lShapeLocal(piece.w, piece.d, piece.armDepth, piece.legWidth, piece.corner);
+  }
+  return rectLocal(piece.w, piece.d);
+}
+
+export function pieceCorners(piece) {
+  return placeLocal(pieceLocal(piece), piece.x, piece.y, piece.rot || 0);
+}
+
+// A point guaranteed to sit on solid footprint, so a label never lands in the
+// notch of an L.
+export function pieceLabelAnchor(piece) {
+  if (piece.shape !== 'L') return { x: 0, y: 0 };
+
+  const { w, d, armDepth: arm, legWidth: leg } = piece;
+  if (!(arm > 0) || !(leg > 0) || arm >= d || leg >= w) return { x: 0, y: 0 };
+
+  const southern = piece.corner === 'se' || piece.corner === 'sw';
+  return { x: 0, y: southern ? d / 2 - arm / 2 : -d / 2 + arm / 2 };
+}
+
+export function rectCorners({ x, y, w, d, rot = 0 }) {
+  return placeLocal(rectLocal(w, d), x, y, rot);
 }
 
 export function polygonArea(points) {

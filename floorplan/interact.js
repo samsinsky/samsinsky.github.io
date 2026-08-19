@@ -2,7 +2,7 @@
 // Modes: select | calibrate | trace-room | place-door
 
 import {
-  rectCorners,
+  pieceCorners,
   segments,
   findFlushTranslation,
   snapToGrid,
@@ -42,7 +42,7 @@ function furnitureEdges(doc, excludeId) {
   const out = [];
   for (const piece of doc.furniture) {
     if (piece.id === excludeId) continue;
-    out.push(...segments(rectCorners(piece), true));
+    out.push(...segments(pieceCorners(piece), true));
   }
   return out;
 }
@@ -52,7 +52,7 @@ function furnitureEdges(doc, excludeId) {
 function applySnapping(doc, piece, candidate, { suspend = false } = {}) {
   if (suspend || !doc.settings.snapOn) return candidate;
 
-  const edgesAt = (at) => segments(rectCorners({ ...piece, x: at.x, y: at.y }), true);
+  const edgesAt = (at) => segments(pieceCorners({ ...piece, x: at.x, y: at.y }), true);
   const walls = wallSegments(doc);
   const others = furnitureEdges(doc, piece.id);
 

@@ -15,7 +15,16 @@ import {
   findFlushTranslation,
   bounds,
   segments,
+  lShapeLocal,
+  pieceLocal,
+  pieceCorners,
+  pieceLabelAnchor,
 } from '../geometry.js';
+
+// The sectional from the design: 84" run, 36" deep, with a 36"-wide chaise
+// making the whole thing 64" front to back.
+const SECTIONAL = { w: 84, d: 64, armDepth: 36, legWidth: 36, shape: 'L', corner: 'ne' };
+const has = (pts, x, y) => pts.some((p) => Math.abs(p.x - x) < 1e-9 && Math.abs(p.y - y) < 1e-9);
 
 test('parseInches accepts every documented format', () => {
   assert.equal(parseInches('84'), 84);
@@ -255,4 +264,71 @@ test('the second pass cannot undo the first in a narrow gap', () => {
 
   const second = findFlushTranslation(at(afterFirst), walls, { perpendicularTo: first });
   assert.equal(second, null, 'the opposite wall is parallel, not perpendicular');
+});
+
+test('an L is six points bounded by its overall size', () => {
+  const pts = lShapeLocal(84, 64, 36, 36, 'ne');
+  assert.equal(pts.length, 6);
+  const b = bounds(pts);
+  assert.equal(b.width, 84);
+  assert.equal(b.height, 64);
+});
+
+test('an L covers the bounding box minus its notch', () => {
+  const pts = lShapeLocal(84, 64, 36, 36, 'ne');
+  // 84x36 arm plus the 36-wide leg over the remaining 28" of depth.
+  assert.equal(polygonArea(pts), 84 * 36 + 36 * (64 - 36));
+});
+
+test('the corner names which elbow is solid', () => {
+  // 'ne' keeps the top and right edges whole; the notch is bottom-left.
+  const ne = lShapeLocal(84, 64, 36, 36, 'ne');
+  assert.ok(has(ne, 42, -32), 'top-right present');
+  assert.ok(has(ne, 42, 32), 'bottom-right present');
+  assert.ok(has(ne, -42, -32), 'top-left present');
+  assert.ok(!has(ne, -42, 32), 'bottom-left is the notch');
+
+  // 'sw' is the diagonal opposite: the notch moves to top-right.
+  const sw = lShapeLocal(84, 64, 36, 36, 'sw');
+  assert.ok(has(sw, -42, 32), 'bottom-left present');
+  assert.ok(!has(sw, 42, -32), 'top-right is the notch');
+});
+
+test('every corner encloses the same area', () => {
+  const areas = ['nw', 'ne', 'sw', 'se'].map((c) => polygonArea(lShapeLocal(84, 64, 36, 36, c)));
+  for (const area of areas) assert.equal(area, areas[0]);
+});
+
+test('arms that fill the footprint collapse to a rectangle', () => {
+  for (const [arm, leg] of [[64, 36], [36, 84], [0, 36], [36, 0], [99, 99]]) {
+    const pts = lShapeLocal(84, 64, arm, leg, 'ne');
+    assert.equal(pts.length, 4, `arm=${arm} leg=${leg} should degenerate`);
+    assert.equal(polygonArea(pts), 84 * 64);
+  }
+});
+
+test('pieceLocal dispatches on shape', () => {
+  assert.equal(pieceLocal({ w: 84, d: 36 }).length, 4);
+  assert.equal(pieceLocal(SECTIONAL).length, 6);
+});
+
+test('pieceCorners places and rotates an L without distorting it', () => {
+  const placed = pieceCorners({ ...SECTIONAL, x: 200, y: 150, rot: 37 });
+  assert.equal(placed.length, 6);
+  const expected = 84 * 36 + 36 * (64 - 36);
+  assert.ok(Math.abs(polygonArea(placed) - expected) < 1e-6, 'area survives rotation');
+
+  const b = bounds(placed);
+  assert.ok(Math.abs((b.minX + b.maxX) / 2 - 200) > -1, 'stays near its centre');
+});
+
+test('the label anchor lands on solid footprint, not in the notch', () => {
+  // 'ne' notch spans y from -32+36=4 down to 32. The anchor must miss it.
+  const anchor = pieceLabelAnchor(SECTIONAL);
+  assert.deepEqual(anchor, { x: 0, y: -32 + 18 });
+
+  const southern = pieceLabelAnchor({ ...SECTIONAL, corner: 'se' });
+  assert.deepEqual(southern, { x: 0, y: 32 - 18 });
+
+  assert.deepEqual(pieceLabelAnchor({ w: 84, d: 36 }), { x: 0, y: 0 }, 'rectangles centre');
 });

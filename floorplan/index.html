@@ -52,8 +52,21 @@
       </select>
       <label for="furn-name">Name</label>
       <input type="text" id="furn-name" placeholder="Sofa" autocomplete="off">
-      <label for="furn-dims">Width × depth</label>
+      <label for="furn-shape">Shape</label>
+      <select id="furn-shape">
+        <option value="rect">Rectangle</option>
+        <option value="L">L-shape</option>
+      </select>
+      <label for="furn-dims" id="furn-dims-label">Width × depth</label>
       <input type="text" id="furn-dims" placeholder="84 x 36" autocomplete="off">
+      <div id="l-fields" hidden>
+        <label for="furn-arm">Long side depth</label>
+        <input type="text" id="furn-arm" placeholder="36" autocomplete="off">
+        <label for="furn-leg">Short side width</label>
+        <input type="text" id="furn-leg" placeholder="36" autocomplete="off">
+        <label>Corner</label>
+        <div class="corner-picker" id="furn-corner"></div>
+      </div>
       <button class="button primary block" id="btn-add-furniture" type="button">Add to plan</button>
       <ul class="list" id="furniture-list"></ul>
     </section>
@@ -106,6 +119,7 @@
     <div class="toolbar" id="toolbar">
       <span class="mode-label" id="mode-label">Select</span>
       <span class="status" id="status"></span>
+      <span class="saved" id="saved-indicator"></span>
     </div>
     <div class="canvas-wrap" id="canvas-wrap">
       <svg id="canvas" xmlns="http://www.w3.org/2000/svg">

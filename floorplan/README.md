@@ -22,7 +22,9 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
    type that length. Everything downstream depends on this one measurement, so
    pick a long wall with a clearly printed dimension.
 3. **Add furniture** — name plus `84 x 36`, `7' x 3'`, or `7'6" x 2'10"`. A
-   preset dropdown fills in standard sizes to edit from.
+   preset dropdown fills in standard sizes to edit from. Pick **L-shape** for a
+   sectional or corner desk: give the overall footprint, the thickness of each
+   arm, and which corner the elbow sits at.
 4. *(Optional)* **Trace rooms and doors** — makes furniture snap flush to walls
    and draws door swing arcs.
 
@@ -37,8 +39,21 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 | Suspend snapping | hold `⌥` while dragging |
 | Cancel / deselect | `esc` |
 
-Layouts autosave to browser storage. Export JSON to move one between devices,
-or PNG to send to someone.
+## Saving
+
+Layouts autosave to this browser's `localStorage` after every change; the
+toolbar shows the time of the last save. Close the tab and come back whenever —
+your traced rooms and furniture are still there.
+
+Two things that storage cannot do, which is what **Export JSON** is for:
+
+- It is **per-origin**. A layout saved on `localhost:8000` will not appear on
+  `samsinsky.com/floorplan/`, and vice versa.
+- It is **per-browser and per-device**. Your laptop's layout is not on your
+  phone.
+
+Export a `.json` on one and import it on the other. **Export PNG** produces a
+flat image of the whole plan to send to someone.
 
 ## Development
 

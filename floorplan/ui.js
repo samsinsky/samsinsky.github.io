@@ -33,6 +33,7 @@ const refs = {
 
 const store = new Store();
 let lastSelectionKey = null;
+let draftCorner = 'ne';   // elbow chosen in the add-furniture form
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -115,6 +116,17 @@ function renderGating() {
   $('btn-door').setAttribute('aria-pressed', String(store.ui.mode === 'place-door'));
 
   $('status').textContent = store.ui.status;
+
+  const saved = $('saved-indicator');
+  saved.dataset.failed = String(Boolean(store.ui.saveFailed));
+  if (store.ui.saveFailed) {
+    saved.textContent = 'Not saved — export JSON';
+  } else if (store.ui.savedAt) {
+    const at = new Date(store.ui.savedAt);
+    saved.textContent = `Saved ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  } else {
+    saved.textContent = '';
+  }
 }
 
 function renderFurnitureList() {
@@ -287,8 +299,10 @@ function renderSelection() {
       });
     }));
 
+    const isL = piece.shape === 'L';
+
     body.appendChild(field(
-      'Width × depth',
+      isL ? 'Overall width × depth' : 'Width × depth',
       `${formatInches(piece.w)} × ${formatInches(piece.d)}`,
       (value, input) => {
         const parsed = parseDimensionPair(value);
@@ -299,14 +313,56 @@ function renderSelection() {
         }
         store.update((doc) => {
           const t = doc.furniture.find((f) => f.id === piece.id);
-          if (t) {
-            t.w = parsed.w;
-            t.d = parsed.d;
+          if (!t) return;
+          t.w = parsed.w;
+          t.d = parsed.d;
+          // Keep the arms inside the new footprint rather than letting the
+          // shape collapse silently.
+          if (t.shape === 'L') {
+            t.armDepth = Math.min(t.armDepth, t.d - 1);
+            t.legWidth = Math.min(t.legWidth, t.w - 1);
           }
         });
         store.setStatus('');
       },
     ));
+
+    if (isL) {
+      const arm = (label, key, limitKey) => field(
+        label,
+        formatInches(piece[key]),
+        (value, input) => {
+          const inches = parseInches(value);
+          const limit = store.doc.furniture.find((f) => f.id === piece.id)?.[limitKey];
+          if (inches === null || inches <= 0 || inches >= limit) {
+            store.setStatus(`Must be between 0 and ${formatInches(limit)}.`);
+            input.value = formatInches(piece[key]);
+            return;
+          }
+          store.update((doc) => {
+            const t = doc.furniture.find((f) => f.id === piece.id);
+            if (t) t[key] = inches;
+          });
+          store.setStatus('');
+        },
+      );
+
+      body.appendChild(arm('Long side depth', 'armDepth', 'd'));
+      body.appendChild(arm('Short side width', 'legWidth', 'w'));
+
+      const cornerLabel = document.createElement('label');
+      cornerLabel.textContent = 'Corner';
+      body.appendChild(cornerLabel);
+
+      const picker = document.createElement('div');
+      picker.className = 'corner-picker';
+      body.appendChild(cornerPicker(picker, piece.corner, (corner) => {
+        store.update((doc) => {
+          const t = doc.furniture.find((f) => f.id === piece.id);
+          if (t) t.corner = corner;
+        });
+      }));
+    }
 
     body.appendChild(field('Rotation °', String(Math.round(piece.rot)), (value) => {
       const deg = parseFloat(value);
@@ -384,6 +440,60 @@ function renderSelection() {
     row2.appendChild(button('Delete', () => deleteSelected(store), 'danger'));
     body.appendChild(row2);
   }
+}
+
+// The glyphs are the elbow: ┌ is a piece whose arms meet at its top-left.
+const CORNERS = [
+  ['nw', '\u250c'], ['ne', '\u2510'],
+  ['sw', '\u2514'], ['se', '\u2518'],
+];
+
+function cornerPicker(container, current, onPick) {
+  container.textContent = '';
+  for (const [corner, glyph] of CORNERS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = glyph;
+    b.title = `Elbow at ${corner.toUpperCase()}`;
+    b.setAttribute('aria-pressed', String(corner === current));
+    b.addEventListener('click', () => {
+      onPick(corner);
+      for (const sib of container.children) {
+        sib.setAttribute('aria-pressed', String(sib === b));
+      }
+    });
+    container.appendChild(b);
+  }
+  return container;
+}
+
+// Reads the add-furniture form into a piece shape, or an error to show.
+function readShapeForm() {
+  const parsed = parseDimensionPair($('furn-dims').value);
+  if (!parsed) {
+    return { error: 'Enter dimensions as width × depth — 84 x 36, or 7\' x 3\'.' };
+  }
+  if ($('furn-shape').value !== 'L') {
+    return { shape: 'rect', w: parsed.w, d: parsed.d };
+  }
+
+  const armDepth = parseInches($('furn-arm').value);
+  const legWidth = parseInches($('furn-leg').value);
+  if (armDepth === null || legWidth === null || armDepth <= 0 || legWidth <= 0) {
+    return { error: 'An L needs a long side depth and a short side width.' };
+  }
+  if (armDepth >= parsed.d || legWidth >= parsed.w) {
+    return {
+      error: `Those arms fill the whole footprint. Long side depth must be under ${formatInches(parsed.d)} and short side width under ${formatInches(parsed.w)}.`,
+    };
+  }
+  return { shape: 'L', w: parsed.w, d: parsed.d, armDepth, legWidth, corner: draftCorner };
+}
+
+function syncShapeForm() {
+  const isL = $('furn-shape').value === 'L';
+  $('l-fields').hidden = !isL;
+  $('furn-dims-label').textContent = isL ? 'Overall width × depth' : 'Width × depth';
 }
 
 function button(text, onClick, extraClass = '') {
@@ -464,9 +574,9 @@ function applyScale() {
 }
 
 function addFurniture() {
-  const parsed = parseDimensionPair($('furn-dims').value);
-  if (!parsed) {
-    store.setStatus('Enter dimensions as width × depth — 84 x 36, or 7\' x 3\'.');
+  const shape = readShapeForm();
+  if (shape.error) {
+    store.setStatus(shape.error);
     return;
   }
 
@@ -478,8 +588,7 @@ function addFurniture() {
     doc.furniture.push({
       id,
       name,
-      w: parsed.w,
-      d: parsed.d,
+      ...shape,
       x: centre.x,
       y: centre.y,
       rot: 0,
@@ -492,6 +601,8 @@ function addFurniture() {
 
   $('furn-name').value = '';
   $('furn-dims').value = '';
+  $('furn-arm').value = '';
+  $('furn-leg').value = '';
   $('preset').value = '';
   store.setStatus(`Added ${name}. Drag it into place.`);
 }
@@ -556,7 +667,17 @@ function wire() {
     if (!preset) return;
     $('furn-name').value = preset.name;
     $('furn-dims').value = `${preset.w} x ${preset.d}`;
+    $('furn-shape').value = preset.shape === 'L' ? 'L' : 'rect';
+    $('furn-arm').value = preset.armDepth ? String(preset.armDepth) : '';
+    $('furn-leg').value = preset.legWidth ? String(preset.legWidth) : '';
+    syncShapeForm();
   });
+
+  $('furn-shape').addEventListener('change', syncShapeForm);
+  cornerPicker($('furn-corner'), draftCorner, (corner) => {
+    draftCorner = corner;
+  });
+  syncShapeForm();
 
   $('file-input').addEventListener('change', (e) => {
     const file = e.target.files?.[0];
@@ -644,8 +765,29 @@ function wire() {
 
   $('btn-export-png').addEventListener('click', exportPng);
 
+  let resetArmed = false;
+  let resetTimer = null;
+  const disarmReset = () => {
+    resetArmed = false;
+    clearTimeout(resetTimer);
+    $('btn-reset').textContent = 'Start over';
+    $('btn-reset').classList.remove('primary');
+  };
+
   $('btn-reset').addEventListener('click', () => {
-    if (!store.doc.image && !store.doc.furniture.length) return;
+    const { doc } = store;
+    if (!doc.image && !doc.furniture.length && !doc.rooms.length) return;
+
+    if (!resetArmed) {
+      resetArmed = true;
+      $('btn-reset').textContent = 'Erase everything?';
+      $('btn-reset').classList.add('primary');
+      store.setStatus('Click again to erase this layout. Export JSON first if you want to keep it.');
+      resetTimer = setTimeout(disarmReset, 5000);
+      return;
+    }
+
+    disarmReset();
     store.reset();
     store.setStatus('Cleared.');
   });

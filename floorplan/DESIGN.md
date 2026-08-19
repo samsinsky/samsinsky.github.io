@@ -134,7 +134,22 @@ blocks them.
 
 ## Furniture
 
-**Adding:** a form with name and dimensions. A preset dropdown pre-fills
+**Shape:** rectangle or L. An L is its bounding box minus a notch, described by
+four numbers plus a corner: overall `W × D`, the *long side depth* (thickness of
+the arm running along W), the *short side width* (thickness of the arm running
+along D), and which corner the elbow sits at — picked from four glyphs, `┌ ┐ └
+┘`, each drawn as the elbow it produces. This matches how sectionals are
+specced on product pages.
+
+An L is a single piece: it drags, rotates, snaps and exports as one. Because
+snapping consumes edge lists rather than rectangles, an L snaps by its true
+outline, including the two inner edges of the notch — so a coffee table nestles
+into a sectional's corner flush against both.
+
+Degenerate parameters (an arm as thick as the footprint, or zero) collapse to
+the bounding rectangle rather than producing a self-crossing polygon.
+
+**Adding:** a form with name, shape and dimensions. A preset dropdown pre-fills
 standard sizes, which the user then edits to match their actual piece:
 
 Twin bed 39×75 · Full 54×75 · Queen 60×80 · King 76×80 · Cal King 72×84 ·
@@ -144,6 +159,9 @@ Dresser (3-drawer) 36×18 · Desk 60×30 · Office chair 26×26 ·
 Dining table (4) 48×30 · Dining table (6) 72×36 · Dining chair 18×18 ·
 TV stand 60×16 · Bookcase 32×12 · Washer/dryer 27×30 · Refrigerator 36×32 ·
 Rug 60×96 · Rug 96×120
+
+L-shaped presets: Sectional (small) 94×64 with 36" arms · Sectional (large)
+112×88 with 38"/40" arms · Corner desk 60×60 with 24" arms.
 
 **Sidebar list:** every piece, with its dimensions. Click to select and center;
 edit dimensions in place; delete.
@@ -201,6 +219,12 @@ Where two pieces cross, the fills compound into a visibly darker region.
 ## Persistence and export
 
 - **Autosave** to `localStorage` under `floorplan-planner-v1`, debounced 500ms.
+  The toolbar shows the time of the last successful save, and turns red with
+  "not saved" if a write fails — tracing a plan is expensive enough that silent
+  save failure is not acceptable.
+- **Erasing takes two clicks.** "Start over" arms itself and relabels for five
+  seconds before it will actually wipe. Deliberately not a `confirm()` dialog,
+  which blocks the page.
 - The uploaded image is **downscaled to a 2000px long edge and re-encoded as
   JPEG at q0.85** before storage. This keeps a typical plan under 500KB, well
   inside the ~5MB origin quota.
@@ -233,7 +257,7 @@ including to GitHub. Someone who finds the URL gets an empty tool.
 portfolio/floorplan/
   index.html      shell, toolbar, sidebar
   app.css         styling — matches the main site
-  geometry.js     dimension parsing, rect corners, polygon area, snapping
+  geometry.js     dimension parsing, shape polygons, polygon area, snapping
   model.js        state, undo, localStorage, JSON import/export
   render.js       draws the SVG scene from state
   interact.js     pointer/touch handling, mode state machine
@@ -267,7 +291,8 @@ where the bugs will actually be:
 - Inch formatting round-trips
 - Polygon area
 - Rotated rectangle corner computation
-- Grid snapping and parallel-wall detection
+- L-shape polygons: vertex count, area, all four corners, degenerate collapse
+- Grid snapping, parallel-wall detection, and corner settling
 
 Interaction and rendering are verified by hand in the browser.
 

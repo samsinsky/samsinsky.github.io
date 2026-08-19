@@ -1,6 +1,6 @@
 // Document state, undo, persistence, and image intake.
 
-import { dist, polygonArea, bounds, rectCorners } from './geometry.js';
+import { dist, polygonArea, bounds, pieceCorners } from './geometry.js';
 
 export const STORAGE_KEY = 'floorplan-planner-v1';
 const UNDO_LIMIT = 50;
@@ -20,6 +20,9 @@ export const PRESETS = [
   { name: 'King bed', w: 76, d: 80 },
   { name: 'Cal king bed', w: 72, d: 84 },
   { name: 'Sofa (3-seat)', w: 84, d: 36 },
+  { name: 'Sectional (L, small)', w: 94, d: 64, shape: 'L', armDepth: 36, legWidth: 36 },
+  { name: 'Sectional (L, large)', w: 112, d: 88, shape: 'L', armDepth: 38, legWidth: 40 },
+  { name: 'Corner desk (L)', w: 60, d: 60, shape: 'L', armDepth: 24, legWidth: 24 },
   { name: 'Loveseat', w: 60, d: 36 },
   { name: 'Armchair', w: 35, d: 35 },
   { name: 'Coffee table', w: 48, d: 24 },
@@ -96,7 +99,7 @@ export function docBounds(doc) {
 
   for (const room of doc.rooms) pts.push(...room.points);
   for (const door of doc.doors) pts.push(door.p1, door.p2);
-  for (const f of doc.furniture) pts.push(...rectCorners(f));
+  for (const f of doc.furniture) pts.push(...pieceCorners(f));
 
   return bounds(pts) || { minX: 0, minY: 0, maxX: 1000, maxY: 1000, width: 1000, height: 1000 };
 }
@@ -176,6 +179,8 @@ export class Store {
       mode: 'select',
       selection: null,      // { kind: 'furniture'|'room'|'door', id }
       view: null,           // viewBox in world inches
+      savedAt: null,        // timestamp of the last successful autosave
+      saveFailed: false,
       draft: null,          // in-progress trace / door / measurement
       measurement: null,    // { p1, p2 } in image pixels, calibrate mode
       status: '',
@@ -261,10 +266,13 @@ export class Store {
   save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.doc));
-    } catch (err) {
-      this.ui.status = 'Could not autosave — browser storage is full. Export to JSON to keep this layout.';
-      this.emit();
+      this.ui.savedAt = Date.now();
+      this.ui.saveFailed = false;
+    } catch {
+      this.ui.saveFailed = true;
+      this.ui.status = 'Could not autosave — browser storage is full. Export to JSON now to keep this layout.';
     }
+    this.emit();
   }
 
   load() {
