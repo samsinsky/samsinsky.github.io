@@ -190,8 +190,14 @@ Rug 60×96 · Rug 96×120
 L-shaped presets: Sectional (small) 94×64 with 36" arms · Sectional (large)
 112×88 with 38"/40" arms · Corner desk 60×60 with 24" arms.
 
-**Sidebar list:** every piece, with its dimensions. Click to select and center;
-edit dimensions in place; delete.
+**Colour** is assigned by cycling a fixed palette, and can be changed per piece
+from the selection panel — eight palette swatches plus a native colour input
+for anything else. Colour is the only thing distinguishing two similar
+rectangles at a glance, so it has to be editable rather than whatever the cycle
+happened to hand out.
+
+**Sidebar list:** every piece, with its dimensions and colour swatch. Click to
+select and center; edit dimensions in place; delete.
 
 ## Interaction
 

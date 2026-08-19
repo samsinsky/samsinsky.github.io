@@ -13,6 +13,7 @@ import {
 import {
   Store,
   PRESETS,
+  PALETTE,
   newId,
   readImageFile,
   inchesPerPixel,
@@ -424,6 +425,19 @@ function renderSelection() {
       });
     }));
 
+    const colourLabel = document.createElement('label');
+    colourLabel.textContent = 'Colour';
+    body.appendChild(colourLabel);
+    body.appendChild(colourPicker(piece.color, (colour) => {
+      store.update((doc) => {
+        const t = doc.furniture.find((f) => f.id === piece.id);
+        if (t) t.color = colour;
+      });
+      // Same selection, so the swatch states need redrawing by hand.
+      lastSelectionKey = null;
+      renderSelection();
+    }));
+
     const row = document.createElement('div');
     row.className = 'row';
     row.append(
@@ -662,6 +676,34 @@ function renderLPreview() {
   label(centres.short.x, centres.short.y, formatInches(leg), {
     transform: `rotate(-90 ${centres.short.x} ${centres.short.y})`,
   });
+}
+
+// Colour is how you tell two beige rectangles apart at a glance, so it is
+// worth changing after the fact rather than taking whatever the cycle assigned.
+function colourPicker(current, onPick) {
+  const wrap = document.createElement('div');
+  wrap.className = 'swatch-picker';
+
+  for (const colour of PALETTE) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.background = colour;
+    b.title = colour;
+    b.setAttribute('aria-label', `Colour ${colour}`);
+    b.setAttribute('aria-pressed', String(colour.toLowerCase() === String(current).toLowerCase()));
+    b.addEventListener('click', () => onPick(colour));
+    wrap.appendChild(b);
+  }
+
+  const custom = document.createElement('input');
+  custom.type = 'color';
+  custom.value = /^#[0-9a-f]{6}$/i.test(current) ? current : '#2f6f9f';
+  custom.title = 'Custom colour';
+  custom.setAttribute('aria-label', 'Custom colour');
+  custom.addEventListener('change', () => onPick(custom.value));
+  wrap.appendChild(custom);
+
+  return wrap;
 }
 
 function refreshCornerPicker() {

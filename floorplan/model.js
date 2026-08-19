@@ -8,7 +8,7 @@ const MAX_IMAGE_EDGE = 2000;
 const JPEG_QUALITY = 0.85;
 
 // Muted, distinguishable, and legible at 45% opacity over a grey floorplan.
-const PALETTE = [
+export const PALETTE = [
   '#2f6f9f', '#b4643c', '#4f7a4a', '#8a5a9c',
   '#b08a2e', '#3f7d7d', '#a04a5e', '#5c6b8a',
 ];
