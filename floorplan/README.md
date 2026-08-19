@@ -24,7 +24,9 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 3. **Add furniture** — name plus `84 x 36`, `7' x 3'`, or `7'6" x 2'10"`. A
    preset dropdown fills in standard sizes to edit from. Pick **L-shape** for a
    sectional or corner desk: give the overall footprint, the thickness of each
-   arm, and which corner the elbow sits at.
+   arm, and which corner the elbow sits at. The arm thickness is the *seat
+   depth* — around 36", not the length of the sofa. A live diagram shows what
+   your numbers build.
 4. *(Optional)* **Trace rooms and doors** — makes furniture snap flush to walls
    and draws door swing arcs.
 

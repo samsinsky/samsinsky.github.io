@@ -1,7 +1,15 @@
 // Panels, forms, lists, file handling — and the bootstrap that wires
 // everything together.
 
-import { parseInches, parseDimensionPair, formatInches, formatArea, dist } from './geometry.js';
+import {
+  parseInches,
+  parseDimensionPair,
+  formatInches,
+  formatArea,
+  dist,
+  lShapeLocal,
+  lArmCentres,
+} from './geometry.js';
 import {
   Store,
   PRESETS,
@@ -34,6 +42,7 @@ const refs = {
 const store = new Store();
 let lastSelectionKey = null;
 let draftCorner = 'ne';   // elbow chosen in the add-furniture form
+let legTouched = false;   // has the user set the short arm independently?
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +60,12 @@ function download(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function setFieldError(id, message) {
+  const el = $(id);
+  el.textContent = message || '';
+  el.hidden = !message;
 }
 
 function setMode(mode, { toggle = false } = {}) {
@@ -328,7 +343,7 @@ function renderSelection() {
     ));
 
     if (isL) {
-      const arm = (label, key, limitKey) => field(
+      const armField = (label, key, limitKey) => field(
         label,
         formatInches(piece[key]),
         (value, input) => {
@@ -347,8 +362,8 @@ function renderSelection() {
         },
       );
 
-      body.appendChild(arm('Long side depth', 'armDepth', 'd'));
-      body.appendChild(arm('Short side width', 'legWidth', 'w'));
+      body.appendChild(armField('Thickness of the long arm', 'armDepth', 'd'));
+      body.appendChild(armField('Thickness of the short arm', 'legWidth', 'w'));
 
       const cornerLabel = document.createElement('label');
       cornerLabel.textContent = 'Corner';
@@ -480,20 +495,93 @@ function readShapeForm() {
   const armDepth = parseInches($('furn-arm').value);
   const legWidth = parseInches($('furn-leg').value);
   if (armDepth === null || legWidth === null || armDepth <= 0 || legWidth <= 0) {
-    return { error: 'An L needs a long side depth and a short side width.' };
+    return { error: 'An L needs a thickness for each arm — the seat depth, usually around 36".' };
   }
   if (armDepth >= parsed.d || legWidth >= parsed.w) {
     return {
-      error: `Those arms fill the whole footprint. Long side depth must be under ${formatInches(parsed.d)} and short side width under ${formatInches(parsed.w)}.`,
+      error: `Those arms fill the whole footprint, leaving no L. The long arm must be thinner than ${formatInches(parsed.d)} and the short arm thinner than ${formatInches(parsed.w)} — these are seat depths, not the length of the sofa.`,
     };
   }
   return { shape: 'L', w: parsed.w, d: parsed.d, armDepth, legWidth, corner: draftCorner };
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs = {}, text = null) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  if (text !== null) node.textContent = text;
+  return node;
+}
+
+// A live diagram of what the four numbers actually build. No label survives
+// being misread as reliably as a picture does.
+function renderLPreview() {
+  const svg = $('l-preview');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const parsed = parseDimensionPair($('furn-dims').value);
+  if (!parsed) {
+    svg.setAttribute('viewBox', '0 0 100 40');
+    svg.appendChild(svgEl('text', {
+      x: 50, y: 23, 'text-anchor': 'middle', 'font-size': 7,
+      fill: 'oklch(60% 0.015 240)', 'font-family': 'system-ui, sans-serif',
+    }, 'Enter an overall size to preview'));
+    return;
+  }
+
+  const { w, d } = parsed;
+  const arm = parseInches($('furn-arm').value);
+  const leg = parseInches($('furn-leg').value);
+  const degenerate = !(arm > 0) || !(leg > 0) || arm >= d || leg >= w;
+
+  const pad = Math.max(w, d) * 0.22;
+  svg.setAttribute('viewBox', `${-w / 2 - pad} ${-d / 2 - pad} ${w + pad * 2} ${d + pad * 2}`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+  const fs = Math.max(w, d) / 15;
+  const ink = 'oklch(40% 0.02 240)';
+  const accent = degenerate ? 'oklch(52% 0.15 25)' : 'oklch(48% 0.09 245)';
+
+  svg.appendChild(svgEl('polygon', {
+    points: lShapeLocal(w, d, arm, leg, draftCorner).map((p) => `${p.x},${p.y}`).join(' '),
+    fill: accent,
+    'fill-opacity': 0.18,
+    stroke: accent,
+    'stroke-width': 1.5,
+    'stroke-dasharray': degenerate ? '4 3' : 'none',
+    'stroke-linejoin': 'round',
+    'vector-effect': 'non-scaling-stroke',
+  }));
+
+  const label = (x, y, text, extra = {}) => svg.appendChild(svgEl('text', {
+    x, y, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    'font-size': fs, fill: ink, 'font-family': 'system-ui, sans-serif',
+    ...extra,
+  }, text));
+
+  label(0, d / 2 + pad * 0.62, formatInches(w));
+  label(w / 2 + pad * 0.62, 0, formatInches(d), {
+    transform: `rotate(-90 ${w / 2 + pad * 0.62} 0)`,
+  });
+
+  if (degenerate) {
+    label(0, -d / 2 - pad * 0.62, 'arms fill the footprint', { fill: accent, 'font-size': fs * 0.85 });
+    return;
+  }
+
+  const centres = lArmCentres(w, d, arm, leg, draftCorner);
+  label(centres.long.x, centres.long.y, formatInches(arm));
+  label(centres.short.x, centres.short.y, formatInches(leg), {
+    transform: `rotate(-90 ${centres.short.x} ${centres.short.y})`,
+  });
 }
 
 function syncShapeForm() {
   const isL = $('furn-shape').value === 'L';
   $('l-fields').hidden = !isL;
   $('furn-dims-label').textContent = isL ? 'Overall width × depth' : 'Width × depth';
+  if (isL) renderLPreview();
 }
 
 function button(text, onClick, extraClass = '') {
@@ -554,9 +642,12 @@ function applyScale() {
 
   if (!m) return;
   if (inches === null || inches <= 0) {
-    store.setStatus('Could not read that length. Try 14\'5, 173, or 14\' 5".');
+    const message = 'Could not read that length. Try 14\'5, 173, or 14\' 5".';
+    setFieldError('scale-error', message);
+    store.setStatus(message);
     return;
   }
+  setFieldError('scale-error', '');
 
   const previous = inchesPerPixel(store.doc);
   store.update((doc) => {
@@ -576,9 +667,11 @@ function applyScale() {
 function addFurniture() {
   const shape = readShapeForm();
   if (shape.error) {
+    setFieldError('furniture-error', shape.error);
     store.setStatus(shape.error);
     return;
   }
+  setFieldError('furniture-error', '');
 
   const name = $('furn-name').value.trim() || 'Furniture';
   const centre = viewCentre();
@@ -604,6 +697,8 @@ function addFurniture() {
   $('furn-arm').value = '';
   $('furn-leg').value = '';
   $('preset').value = '';
+  legTouched = false;
+  renderLPreview();
   store.setStatus(`Added ${name}. Drag it into place.`);
 }
 
@@ -670,13 +765,28 @@ function wire() {
     $('furn-shape').value = preset.shape === 'L' ? 'L' : 'rect';
     $('furn-arm').value = preset.armDepth ? String(preset.armDepth) : '';
     $('furn-leg').value = preset.legWidth ? String(preset.legWidth) : '';
+    legTouched = Boolean(preset.legWidth && preset.legWidth !== preset.armDepth);
     syncShapeForm();
   });
 
   $('furn-shape').addEventListener('change', syncShapeForm);
   cornerPicker($('furn-corner'), draftCorner, (corner) => {
     draftCorner = corner;
+    renderLPreview();
   });
+
+  // Both arms of a sectional are almost always the same seat depth, so mirror
+  // the first into the second until the user says otherwise.
+  $('furn-arm').addEventListener('input', () => {
+    if (!legTouched) $('furn-leg').value = $('furn-arm').value;
+  });
+  $('furn-leg').addEventListener('input', () => {
+    legTouched = true;
+  });
+  for (const id of ['furn-dims', 'furn-arm', 'furn-leg']) {
+    $(id).addEventListener('input', renderLPreview);
+  }
+
   syncShapeForm();
 
   $('file-input').addEventListener('change', (e) => {
@@ -718,6 +828,10 @@ function wire() {
   });
 
   $('btn-add-furniture').addEventListener('click', addFurniture);
+  for (const id of ['furn-dims', 'furn-arm', 'furn-leg']) {
+    $(id).addEventListener('input', () => setFieldError('furniture-error', ''));
+  }
+  $('real-length').addEventListener('input', () => setFieldError('scale-error', ''));
   $('furn-dims').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();

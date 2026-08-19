@@ -135,11 +135,19 @@ blocks them.
 ## Furniture
 
 **Shape:** rectangle or L. An L is its bounding box minus a notch, described by
-four numbers plus a corner: overall `W × D`, the *long side depth* (thickness of
-the arm running along W), the *short side width* (thickness of the arm running
-along D), and which corner the elbow sits at — picked from four glyphs, `┌ ┐ └
-┘`, each drawn as the elbow it produces. This matches how sectionals are
-specced on product pages.
+four numbers plus a corner: overall `W × D`, the *thickness of the long arm*
+(running along W), the *thickness of the short arm* (running along D), and
+which corner the elbow sits at — picked from four glyphs, `┌ ┐ └ ┘`, each drawn
+as the elbow it produces.
+
+**A live preview is not optional here.** The arm thicknesses are a seat depth
+(~36"), but every name for them reads plausibly as the *length* of the sofa —
+the first user of this feature entered their overall depth and got a silent
+refusal. So the panel draws the shape as you type, annotated with all four
+dimensions, and shows a dashed red outline captioned "arms fill the footprint"
+when the numbers leave no L. Since both arms of a sectional are almost always
+the same seat depth, typing the first mirrors it into the second until the user
+edits the second directly.
 
 An L is a single piece: it drags, rotates, snaps and exports as one. Because
 snapping consumes edge lists rather than rectangles, an L snaps by its true
@@ -225,6 +233,18 @@ Where two pieces cross, the fills compound into a visibly darker region.
 - **Erasing takes two clicks.** "Start over" arms itself and relabels for five
   seconds before it will actually wipe. Deliberately not a `confirm()` dialog,
   which blocks the page.
+
+## Feedback placement
+
+Validation messages appear **inline, beneath the control that produced them**,
+not only in the toolbar. The toolbar status line sits ~700px from the sidebar
+buttons; a refusal shown only there reads as the button doing nothing, which is
+exactly how the first L-shape bug was reported. Inline errors clear as soon as
+the user edits the offending field.
+
+Gated cards dim their controls but keep a full-opacity note saying what unlocks
+them. A card with `pointer-events: none` and no explanation swallows clicks
+silently — the worst possible failure for a step-gated flow.
 - The uploaded image is **downscaled to a 2000px long edge and re-encoded as
   JPEG at q0.85** before storage. This keeps a typical plan under 500KB, well
   inside the ~5MB origin quota.

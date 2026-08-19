@@ -197,6 +197,19 @@ export function pieceCorners(piece) {
   return placeLocal(pieceLocal(piece), piece.x, piece.y, piece.rot || 0);
 }
 
+// Centres of an L's two arms — where to put a thickness annotation, and where
+// a label is guaranteed to sit on solid footprint.
+export function lArmCentres(w, d, armDepth, legWidth, corner = 'ne') {
+  const flipX = corner === 'nw' || corner === 'sw';
+  const flipY = corner === 'se' || corner === 'sw';
+  const place = (p) => ({ x: flipX ? -p.x : p.x, y: flipY ? -p.y : p.y });
+
+  return {
+    long: place({ x: 0, y: -d / 2 + armDepth / 2 }),
+    short: place({ x: w / 2 - legWidth / 2, y: 0 }),
+  };
+}
+
 // A point guaranteed to sit on solid footprint, so a label never lands in the
 // notch of an L.
 export function pieceLabelAnchor(piece) {
@@ -205,8 +218,7 @@ export function pieceLabelAnchor(piece) {
   const { w, d, armDepth: arm, legWidth: leg } = piece;
   if (!(arm > 0) || !(leg > 0) || arm >= d || leg >= w) return { x: 0, y: 0 };
 
-  const southern = piece.corner === 'se' || piece.corner === 'sw';
-  return { x: 0, y: southern ? d / 2 - arm / 2 : -d / 2 + arm / 2 };
+  return lArmCentres(w, d, arm, leg, piece.corner).long;
 }
 
 export function rectCorners({ x, y, w, d, rot = 0 }) {
