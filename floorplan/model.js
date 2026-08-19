@@ -20,9 +20,10 @@ export const PRESETS = [
   { name: 'King bed', w: 76, d: 80 },
   { name: 'Cal king bed', w: 72, d: 84 },
   { name: 'Sofa (3-seat)', w: 84, d: 36 },
-  { name: 'Sectional (L, small)', w: 94, d: 64, shape: 'L', armDepth: 36, legWidth: 36 },
-  { name: 'Sectional (L, large)', w: 112, d: 88, shape: 'L', armDepth: 38, legWidth: 40 },
-  { name: 'Corner desk (L)', w: 60, d: 60, shape: 'L', armDepth: 24, legWidth: 24 },
+  // Sectionals are sold left- or right-facing; the size is edited per piece.
+  { name: 'Sectional (chaise left)', w: 106, d: 84, shape: 'L', armDepth: 36, legWidth: 36, corner: 'nw' },
+  { name: 'Sectional (chaise right)', w: 106, d: 84, shape: 'L', armDepth: 36, legWidth: 36, corner: 'ne' },
+  { name: 'Corner desk (L)', w: 60, d: 60, shape: 'L', armDepth: 24, legWidth: 24, corner: 'ne' },
   { name: 'Loveseat', w: 60, d: 36 },
   { name: 'Armchair', w: 35, d: 35 },
   { name: 'Coffee table', w: 48, d: 24 },

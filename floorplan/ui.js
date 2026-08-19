@@ -28,6 +28,15 @@ import { attachInteractions, finishRoom, deleteSelected, duplicateSelected } fro
 
 const $ = (id) => document.getElementById(id);
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs = {}, text = null) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  if (text !== null) node.textContent = text;
+  return node;
+}
+
 const refs = {
   svg: $('canvas'),
   defs: $('defs'),
@@ -385,17 +394,25 @@ function renderSelection() {
       body.appendChild(thickness('Chaise width', 'legWidth', 'w'));
 
       const cornerLabel = document.createElement('label');
-      cornerLabel.textContent = 'Corner';
+      cornerLabel.textContent = 'Which side is the chaise on?';
       body.appendChild(cornerLabel);
 
       const picker = document.createElement('div');
       picker.className = 'corner-picker';
-      body.appendChild(cornerPicker(picker, piece.corner, (corner) => {
-        store.update((doc) => {
-          const t = doc.furniture.find((f) => f.id === piece.id);
-          if (t) t.corner = corner;
-        });
-      }));
+      body.appendChild(cornerPicker(
+        picker,
+        piece.corner,
+        (corner) => {
+          store.update((doc) => {
+            const t = doc.furniture.find((f) => f.id === piece.id);
+            if (t) t.corner = corner;
+          });
+          // The selection key is unchanged, so redraw the picker by hand.
+          lastSelectionKey = null;
+          renderSelection();
+        },
+        { w: piece.w, d: piece.d, arm: piece.armDepth, leg: piece.legWidth },
+      ));
     }
 
     body.appendChild(field('Rotation °', String(Math.round(piece.rot)), (value) => {
@@ -476,26 +493,60 @@ function renderSelection() {
   }
 }
 
-// The glyphs are the elbow: ┌ is a piece whose arms meet at its top-left.
-const CORNERS = [
-  ['nw', '\u250c'], ['ne', '\u2510'],
-  ['sw', '\u2514'], ['se', '\u2518'],
+// Only two of the four corners are distinct pieces. Rotation reaches the other
+// two -- 'sw' is 'ne' turned 180 degrees, 'se' is 'nw' turned 180 degrees --
+// but no rotation mirrors a shape, so a left-facing sectional never becomes a
+// right-facing one. Handedness is the only thing worth asking about.
+const FACINGS = [
+  { corner: 'nw', label: 'Chaise left' },
+  { corner: 'ne', label: 'Chaise right' },
 ];
 
-function cornerPicker(container, current, onPick) {
+// Documents saved before the picker was reduced may hold the rotated variants.
+function facingOf(corner) {
+  return corner === 'nw' || corner === 'sw' ? 'nw' : 'ne';
+}
+
+const FALLBACK_SHAPE = { w: 106, d: 84, arm: 36, leg: 36 };
+
+function cornerThumb(corner, { w, d, arm, leg }) {
+  const pad = Math.max(w, d) * 0.09;
+  const svg = svgEl('svg', {
+    viewBox: `${-w / 2 - pad} ${-d / 2 - pad} ${w + pad * 2} ${d + pad * 2}`,
+    preserveAspectRatio: 'xMidYMid meet',
+  });
+  svg.appendChild(svgEl('polygon', {
+    points: lShapeLocal(w, d, arm, leg, corner).map((p) => `${p.x},${p.y}`).join(' '),
+    fill: 'currentColor',
+    'fill-opacity': 0.22,
+    stroke: 'currentColor',
+    'stroke-width': 1.5,
+    'stroke-linejoin': 'round',
+    'vector-effect': 'non-scaling-stroke',
+  }));
+  return svg;
+}
+
+function cornerPicker(container, current, onPick, dims) {
+  const shape = dims && dims.w > 0 && dims.d > 0 && dims.arm > 0 && dims.leg > 0
+    && dims.arm < dims.d && dims.leg < dims.w
+    ? dims
+    : FALLBACK_SHAPE;
+
   container.textContent = '';
-  for (const [corner, glyph] of CORNERS) {
+  for (const { corner, label } of FACINGS) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = glyph;
-    b.title = `Elbow at ${corner.toUpperCase()}`;
-    b.setAttribute('aria-pressed', String(corner === current));
-    b.addEventListener('click', () => {
-      onPick(corner);
-      for (const sib of container.children) {
-        sib.setAttribute('aria-pressed', String(sib === b));
-      }
-    });
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-pressed', String(facingOf(current) === corner));
+    b.appendChild(cornerThumb(corner, shape));
+
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    b.appendChild(caption);
+
+    b.addEventListener('click', () => onPick(corner));
     container.appendChild(b);
   }
   return container;
@@ -547,18 +598,11 @@ function readShapeForm() {
 }
 
 
-const SVG_NS = 'http://www.w3.org/2000/svg';
-
-function svgEl(tag, attrs = {}, text = null) {
-  const node = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
-  if (text !== null) node.textContent = text;
-  return node;
-}
-
 // A live diagram of what the four numbers actually build. No label survives
 // being misread as reliably as a picture does.
 function renderLPreview() {
+  refreshCornerPicker();
+
   const svg = $('l-preview');
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
@@ -618,6 +662,19 @@ function renderLPreview() {
   label(centres.short.x, centres.short.y, formatInches(leg), {
     transform: `rotate(-90 ${centres.short.x} ${centres.short.y})`,
   });
+}
+
+function refreshCornerPicker() {
+  const arms = readArms();
+  cornerPicker(
+    $('furn-corner'),
+    draftCorner,
+    (corner) => {
+      draftCorner = corner;
+      renderLPreview();
+    },
+    arms && { w: arms.w, d: arms.d, arm: arms.armDepth, leg: arms.legWidth },
+  );
 }
 
 function syncShapeForm() {
@@ -814,6 +871,7 @@ function wire() {
       $('furn-seat').value = String(preset.armDepth);
       $('furn-split').checked = preset.legWidth !== preset.armDepth;
       $('furn-chaise').value = String(preset.legWidth);
+      if (preset.corner) draftCorner = preset.corner;
     } else {
       $('furn-ldims').value = '';
       $('furn-seat').value = '';
@@ -824,10 +882,6 @@ function wire() {
   });
 
   $('furn-shape').addEventListener('change', syncShapeForm);
-  cornerPicker($('furn-corner'), draftCorner, (corner) => {
-    draftCorner = corner;
-    renderLPreview();
-  });
 
   // Both arms of a sectional are almost always the same seat depth, so mirror
   // the first into the second until the user says otherwise.

@@ -27,8 +27,10 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
    Pick **L-shape** for a sectional or corner desk and type what the product
    page prints: total width × depth, then the seat depth. A 106" sectional 84"
    deep with a 36" seat is `106 x 84` and `36`. Tick *chaise is a different
-   width* only if the two arms genuinely differ. A live diagram shows the shape
-   as you type, so you can see it is right before adding it.
+   width* only if the two arms genuinely differ. Pick **chaise left** or
+   **chaise right** — the only two distinct pieces, since rotation covers every
+   other orientation. A live diagram shows the shape as you type, so you can
+   see it is right before adding it.
 4. *(Optional)* **Trace rooms and doors** — makes furniture snap flush to walls
    and draws door swing arcs.
 

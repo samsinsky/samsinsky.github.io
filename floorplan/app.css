@@ -215,29 +215,39 @@ input[type="text"]:focus, select:focus {
 /* Four elbow glyphs laid out as the corners they represent. */
 .corner-picker {
   display: grid;
-  grid-template-columns: repeat(2, 34px);
-  gap: 4px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
   margin-top: 2px;
 }
 
 .corner-picker button {
-  height: 34px;
-  font-size: 17px;
-  line-height: 1;
-  padding: 0;
-  font-family: ui-monospace, monospace;
+  padding: 9px 6px 7px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
-  color: var(--ink-soft);
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
+.corner-picker button svg { width: 100%; height: 46px; display: block; }
+
+.corner-picker button span {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.corner-picker button[aria-pressed="true"] span { color: var(--accent); }
+.corner-picker button { color: var(--ink-faint); }
+.corner-picker button[aria-pressed="true"] { color: var(--accent); }
 .corner-picker button:hover { border-color: var(--ink-faint); }
 .corner-picker button[aria-pressed="true"] {
-  background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  box-shadow: 0 0 0 1.5px var(--accent);
 }
 
 .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }

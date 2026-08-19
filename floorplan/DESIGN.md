@@ -154,8 +154,19 @@ reading off, never numbers they have to compute.**
 
 A live preview backs this up regardless of labelling: the panel draws the shape
 as you type, annotated with every dimension, and shows a dashed red outline
-when the numbers leave no L. Picking which corner the elbow sits at uses four
-glyphs, `┌ ┐ └ ┘`, each drawn as the elbow it produces.
+when the numbers leave no L.
+
+**Handedness, not orientation.** The model stores a `corner` of `nw|ne|sw|se`,
+but the form offers only two choices — *chaise left* and *chaise right*. The
+other two are reachable by rotating the piece: `sw` is `ne` turned 180°, and
+`se` is `nw` turned 180°. What rotation cannot do is mirror, so a left-facing
+sectional never becomes a right-facing one, and that is the only distinction
+worth a control. Sectionals are sold exactly this way.
+
+Each option is rendered as a thumbnail of the shape at the proportions
+currently entered, captioned in words, and placed directly under the seat depth
+rather than below the help text. The earlier version — four abstract glyphs at
+the bottom of the form — was reported as the control not existing.
 
 An L is a single piece: it drags, rotates, snaps and exports as one. Because
 snapping consumes edge lists rather than rectangles, an L snaps by its true
