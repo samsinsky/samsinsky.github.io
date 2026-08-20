@@ -429,6 +429,12 @@ choose which span the calibration line crosses.
 Labels are stored on the document in **image pixels**, so they survive
 re-calibration, and are converted to world inches on demand.
 
+**A read can always be asked for.** Firing only on upload meant any document
+restored from storage — including every layout made before this shipped — had
+no labels and no way to get them, which read as the feature being missing. The
+Scale card now shows the reader whenever there is an image, with a button that
+runs or re-runs it, and renders saved labels without re-reading.
+
 1. **Calibration is a tap, not a transcription.** The Scale card lists what was
    found, grouped under the room name it belongs to. Drag the line across that
    wall, tap `14'5`.

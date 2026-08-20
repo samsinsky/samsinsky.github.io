@@ -26,7 +26,8 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 
    The tool also *reads* your plan while you work: a few seconds after upload,
    the Scale card lists the dimensions it found printed on the image, grouped by
-   room. Tap one instead of typing it. This runs entirely in your browser — no
+   room. Tap one instead of typing it. For a layout that predates this, or to
+   try again, use **Read the plan's printed dimensions** in the same card. This runs entirely in your browser — no
    key, no upload, offline after the first use. It finds maybe half the labels
    and never offers one it is unsure of, so treat it as saved typing rather than
    automation.

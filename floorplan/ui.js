@@ -840,19 +840,35 @@ async function runOcr(dataUrl) {
 
 function renderOcr() {
   const block = $('ocr-block');
+  const hasImage = Boolean(store.doc.image);
+  block.hidden = !hasImage;
+  if (!hasImage) return;
+
   const ocr = store.ui.ocr;
-  block.hidden = !ocr;
-  if (!ocr) return;
+  const labels = store.doc.labels || [];
+  const running = ocr?.state === 'running';
+
+  const button = $('btn-read-plan');
+  button.disabled = running;
+  button.textContent = running
+    ? 'Reading…'
+    : (labels.length || ocr ? 'Read the plan again' : "Read the plan's printed dimensions");
 
   const status = $('ocr-status');
-  status.textContent = ocr.message;
-  status.dataset.busy = String(ocr.state === 'running');
+  status.dataset.busy = String(running);
+  if (ocr) {
+    status.textContent = ocr.message;
+  } else if (labels.length) {
+    status.textContent = `${labels.length} dimension${labels.length === 1 ? '' : 's'} read from this plan. Drag your line across the matching wall, then tap the value.`;
+  } else {
+    status.textContent = 'Finds the dimensions printed on your plan so you can tap them instead of typing. Runs in this browser — nothing is uploaded.';
+  }
 
   const results = $('ocr-results');
   results.textContent = '';
-  if (ocr.state !== 'done') return;
+  if (running) return;
 
-  for (const label of store.doc.labels || []) {
+  for (const label of labels) {
     const row = document.createElement('div');
     row.className = 'ocr-label';
 
@@ -1130,6 +1146,10 @@ function wire() {
   $('btn-calibrate').addEventListener('click', () => setMode('calibrate', { toggle: true }));
   $('btn-trace').addEventListener('click', () => setMode('trace-room', { toggle: true }));
   $('btn-door').addEventListener('click', () => setMode('place-door', { toggle: true }));
+
+  $('btn-read-plan').addEventListener('click', () => {
+    if (store.doc.image) runOcr(store.doc.image.dataUrl);
+  });
 
   $('btn-apply-scale').addEventListener('click', applyScale);
   $('real-length').addEventListener('keydown', (e) => {
