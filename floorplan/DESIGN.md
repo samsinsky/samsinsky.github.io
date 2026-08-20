@@ -361,15 +361,54 @@ Interaction and rendering are verified by hand in the browser.
 
 ---
 
-# Appendix — Phase 2: AI-assisted import
+# Phase 2 — Reading the plan's own labels
 
-Not built in phase 1. Recorded here so phase 1 does not paint it into a corner.
+**Built.** Not with a vision model, and not with an API key. What shipped is
+OCR — Tesseract compiled to WASM, running in a Web Worker in the browser.
+Nothing is uploaded, nothing needs a key, and it works offline after the first
+use.
 
-## The governing constraint
+## Why not a model
 
-Vision models read text reliably and report pixel coordinates unreliably. Every
-decision below follows from that split: **the model supplies numbers, the human
-supplies geometry.**
+The governing constraint was always that **the reader supplies numbers, the
+human supplies geometry** — models read text far better than they report pixel
+coordinates. OCR takes that further: it reports bounding boxes natively, which
+is what makes room naming and the calibration cross-check possible at all.
+
+A local LLM (Ollama with gemma3, or an in-browser VLM over WebGPU) was
+considered and rejected: 1–5GB of download, desktop-only, and small multimodal
+models misread dense printed digits while sounding certain. OCR is ~4MB, runs
+on a phone, and fails visibly.
+
+## What the spike found, and what it forced
+
+Default Tesseract on a floorplan is bad, in two specific ways that shaped the
+implementation:
+
+1. **It merges across the page.** `FOYER` and `BEDROOM`, at opposite corners,
+   came back as one line `"FOYER BEDROOM"`. Fixed by page segmentation mode 11
+   (sparse text), which treats scattered labels as separate. Room names then
+   read at 91–97% confidence.
+
+2. **It drops apostrophes.** `10'9"` came back as `109`, and `9'1 x 7'10` as
+   `91x 710`. These parse as perfectly good numbers and are wrong by a factor
+   of ten — precisely the silent failure this whole design exists to prevent.
+
+Confidence is *not* a reliable filter for this: at 6× upscale a wrong reading
+(`91x710`) came back at 75% confidence. Two hard rules do the work instead:
+
+- **An explicit foot or inch mark is required.** `91x710` is discarded; `10'9`
+  is kept. This is the single most important line in `ocr.js`.
+- **Measurements must be plausible** — between 1 and 60 feet. A garbled `5'3`
+  once read as `95'3`, keeping its apostrophe.
+
+On the test plan this yields two correct offers and zero wrong ones. Roughly
+half the labels are missed. That is the right trade: a missed dimension costs a
+few seconds of typing, a wrong one silently ruins the layout.
+
+Upscaling to ~1900px on the long edge is worth it; beyond that accuracy plateaus
+and only the clock suffers. About 3–5 seconds per plan, in a worker, so
+calibrating by hand is never blocked.
 
 The example floorplan that motivated this feature demonstrates why. Its room
 labels — `KITCHEN 9'1 x 7'10`, `LIVING / DINING 16'3 x 13'8`, `FOYER 8'1 x
@@ -385,31 +424,25 @@ room is L-shaped and the bedroom has a notch, yet each carries a single
 `W × D`. Those numbers describe a span, not a rectangle — so the human must
 choose which span the calibration line crosses.
 
-## Floorplan import
+## What it drives
 
-On upload, optionally send the image to a vision model and ask for the labels
-it can find:
+Labels are stored on the document in **image pixels**, so they survive
+re-calibration, and are converted to world inches on demand.
 
-```json
-{
-  "rooms": [{ "name": "BEDROOM", "width": "14'5", "depth": "10'9" }],
-  "fixtures": ["W/D", "DW", "MIC", "R", "CL", "CL", "tub", "toilet"]
-}
-```
+1. **Calibration is a tap, not a transcription.** The Scale card lists what was
+   found, grouped under the room name it belongs to. Drag the line across that
+   wall, tap `14'5`.
+2. **Tracing names itself.** A traced room adopts the name of the label printed
+   inside it, falling back to `Room N`.
+3. **Tracing checks the calibration.** *"Traced 14' 4.8" × 11' 0.5", plan says
+   14' 5" × 10' 9". Your scale checks out."* Over 5% drift and it says so
+   instead. This is the safety net for the one measurement everything else
+   depends on, and it costs nothing — it caught a deliberately bad calibration
+   during testing, reporting it as 39% out.
 
-Coordinates are never requested. The results drive two things:
+Nothing is ever applied automatically.
 
-1. **Calibration becomes a pick, not a transcription.** Drag the line across
-   the bedroom, then choose "Bedroom — 14'5" from a dropdown instead of typing.
-2. **Tracing becomes self-checking.** Trace a room and the tool compares the
-   traced extent against the stated label: *"traced 14'2 × 10'11 — label says
-   14'5 × 10'9."* Agreement confirms the calibration; an 8% discrepancy is
-   visible immediately. This needs no AI pointing at anything, and it is the
-   main safety net for the whole document.
-
-Room names also pre-populate the name field when tracing.
-
-## Furniture import
+## Not built: furniture import
 
 More reliable than floorplan import, because product pages state dimensions as
 text in a spec table. Two input paths, one extraction schema:
@@ -422,23 +455,12 @@ Both return `{ name, width, depth, height }`, land in the same add-furniture
 form as manual entry, and are editable before committing. Height is captured
 but unused in phase 1.
 
-## API key handling
+## No API key, by construction
 
-The key is **pasted by the user at runtime** into a settings field and stored in
-that browser's local storage. It is never committed, never present in the
-served source, and is transmitted only to the model provider's API.
+Everything runs locally. There is no key to paste, nothing to leak, and no
+per-use cost — which also means the public URL cannot be used to spend anything
+of Sam's. The only third-party dependency is the Tesseract bundle, pinned to a
+version and loaded from jsDelivr with a subresource-integrity hash.
 
-This is the correct choice specifically *because* the page is public. A
-serverless proxy would hide the key from the browser, but would let anyone who
-found the URL spend the key's credits. Browser-only storage means a stranger
-who opens the page sees an empty field, and the tool still works manually.
-
-Consequences to honor in implementation:
-
-- Every AI feature is **optional and additive**. With no key set, the tool
-  behaves exactly as phase 1 — no broken buttons, no nag screens.
-- The key never enters application state that gets serialized. Exported JSON,
-  autosaved documents, and undo snapshots must all exclude it.
-- Failed or refused API calls degrade to manual entry rather than blocking.
-- The model identifier is configurable rather than hardcoded, and must be
-  confirmed current at implementation time.
+Failure is always survivable: if the CDN is unreachable or the read finds
+nothing, the panel says so and manual entry works exactly as before.

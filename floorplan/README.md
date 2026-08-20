@@ -23,6 +23,13 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
 2. **Set the scale** — drag a line across a wall whose real length you know and
    type that length. Everything downstream depends on this one measurement, so
    pick a long wall with a clearly printed dimension.
+
+   The tool also *reads* your plan while you work: a few seconds after upload,
+   the Scale card lists the dimensions it found printed on the image, grouped by
+   room. Tap one instead of typing it. This runs entirely in your browser — no
+   key, no upload, offline after the first use. It finds maybe half the labels
+   and never offers one it is unsure of, so treat it as saved typing rather than
+   automation.
 3. **Add furniture** — name plus `84 x 36`, `7' x 3'`, or `7'6" x 2'10"`. A
    preset dropdown fills in standard sizes to edit from.
 
@@ -34,7 +41,9 @@ storage, and never sent anywhere. Someone who finds the URL gets an empty tool.
    other orientation. A live diagram shows the shape as you type, so you can
    see it is right before adding it.
 4. *(Optional)* **Trace rooms and doors** — makes furniture snap flush to walls
-   and draws door swing arcs.
+   and draws door swing arcs. A traced room names itself from the label printed
+   inside it, and compares what you traced against what the plan claims — a free
+   check that your scale line was right.
 
 | | |
 |---|---|

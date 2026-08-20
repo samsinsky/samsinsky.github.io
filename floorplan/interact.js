@@ -10,8 +10,10 @@ import {
   closestPointOnSegment,
   dist,
   normalizeAngle,
+  bounds,
+  formatInches,
 } from './geometry.js';
-import { inchesPerPixel, newId } from './model.js';
+import { inchesPerPixel, newId, labelsInWorld } from './model.js';
 import { fitView } from './render.js';
 
 const MIN_VIEW = 12;        // inches across — about a foot
@@ -496,6 +498,39 @@ export function attachInteractions(store, refs) {
 
 // ── Actions shared with the sidebar ─────────────────────────────────────────
 
+// The label whose printed position falls inside the room just traced.
+function labelInside(store, box) {
+  const centre = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+  let best = null;
+
+  for (const label of labelsInWorld(store.doc)) {
+    const { x, y } = label.centre;
+    if (x < box.minX || x > box.maxX || y < box.minY || y > box.maxY) continue;
+    const d = dist(label.centre, centre);
+    if (!best || d < best.d) best = { d, label };
+  }
+  return best?.label || null;
+}
+
+// Comparing what was traced against what the plan claims is a free check on
+// the one measurement everything else depends on. Orientation-agnostic: a room
+// traced the long way round is the same room.
+function crossCheck(box, label) {
+  const traced = [box.width, box.height].sort((a, b) => b - a);
+  const stated = [label.w, label.d].sort((a, b) => b - a);
+  const drift = Math.max(
+    Math.abs(traced[0] - stated[0]) / stated[0],
+    Math.abs(traced[1] - stated[1]) / stated[1],
+  );
+
+  const summary = `Traced ${formatInches(traced[0])} × ${formatInches(traced[1])}, `
+    + `plan says ${formatInches(stated[0])} × ${formatInches(stated[1])}.`;
+
+  return drift > 0.05
+    ? `${summary} That is ${Math.round(drift * 100)}% out — worth re-checking your scale line.`
+    : `${summary} Your scale checks out.`;
+}
+
 export function finishRoom(store) {
   const draft = store.ui.draft;
   if (!draft || draft.kind !== 'room' || draft.points.length < 3) {
@@ -505,15 +540,24 @@ export function finishRoom(store) {
 
   const id = newId('room');
   const points = draft.points.map((p) => ({ x: p.x, y: p.y }));
+  const label = labelInside(store, bounds(points));
+
   store.update((doc) => {
-    doc.rooms.push({ id, name: `Room ${doc.rooms.length + 1}`, points });
+    doc.rooms.push({
+      id,
+      name: label?.name || `Room ${doc.rooms.length + 1}`,
+      points,
+    });
   });
   store.updateUi((ui) => {
     ui.draft = null;
     ui.mode = 'select';
     ui.selection = { kind: 'room', id };
   });
-  store.setStatus('Room traced. Rename it in the panel.');
+
+  store.setStatus(label
+    ? crossCheck(bounds(points), label)
+    : 'Room traced. Rename it in the panel.');
 }
 
 export function deleteSelected(store) {

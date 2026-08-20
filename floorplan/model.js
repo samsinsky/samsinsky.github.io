@@ -58,6 +58,7 @@ export function emptyDoc() {
     rooms: [],
     doors: [],
     furniture: [],
+    labels: [],          // dimensions read off the image, in image pixels
     settings: { gridOn: false, gridSize: 6, snapOn: true },
   };
 }
@@ -81,6 +82,16 @@ export function imageSizeInches(doc) {
     width: doc.image.naturalWidth * ipp,
     height: doc.image.naturalHeight * ipp,
   };
+}
+
+// Labels are stored in image pixels so they survive re-calibration; callers
+// that need to compare them against traced geometry want world inches.
+export function labelsInWorld(doc) {
+  const ipp = inchesPerPixel(doc);
+  return (doc.labels || []).map((label) => ({
+    ...label,
+    centre: { x: label.centre.x * ipp, y: label.centre.y * ipp },
+  }));
 }
 
 export function isCalibrated(doc) {

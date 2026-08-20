@@ -24,6 +24,7 @@ import {
   roomArea,
   docBounds,
 } from './model.js';
+import { readFloorplanLabels } from './ocr.js';
 import { render, fitView } from './render.js';
 import { attachInteractions, finishRoom, deleteSelected, duplicateSelected } from './interact.js';
 
@@ -803,6 +804,82 @@ function button(text, onClick, extraClass = '') {
   return b;
 }
 
+// Reading the plan's own labels. Runs in a worker off the back of an upload,
+// so it never blocks calibrating by hand — the results just show up when they
+// show up, and are offered, never applied.
+async function runOcr(dataUrl) {
+  store.updateUi((ui) => {
+    ui.ocr = { state: 'running', message: 'Reading the dimensions printed on your plan…' };
+  });
+
+  try {
+    const labels = await readFloorplanLabels(dataUrl, (message) => {
+      store.updateUi((ui) => {
+        ui.ocr = { state: 'running', message: `${message}` };
+      });
+    });
+
+    store.update((doc) => {
+      doc.labels = labels;
+    }, { undoable: false });
+
+    store.updateUi((ui) => {
+      ui.ocr = {
+        state: 'done',
+        message: labels.length
+          ? `Found ${labels.length} dimension${labels.length === 1 ? '' : 's'} on the plan. Drag your line across the matching wall, then tap the value.`
+          : 'Could not read any dimensions off this plan — type the length in yourself.',
+      };
+    });
+  } catch (err) {
+    store.updateUi((ui) => {
+      ui.ocr = { state: 'error', message: `${err.message} Type the length in yourself.` };
+    });
+  }
+}
+
+function renderOcr() {
+  const block = $('ocr-block');
+  const ocr = store.ui.ocr;
+  block.hidden = !ocr;
+  if (!ocr) return;
+
+  const status = $('ocr-status');
+  status.textContent = ocr.message;
+  status.dataset.busy = String(ocr.state === 'running');
+
+  const results = $('ocr-results');
+  results.textContent = '';
+  if (ocr.state !== 'done') return;
+
+  for (const label of store.doc.labels || []) {
+    const row = document.createElement('div');
+    row.className = 'ocr-label';
+
+    const room = document.createElement('span');
+    room.className = 'room';
+    room.textContent = label.name || 'Unlabelled';
+    row.appendChild(room);
+
+    for (const text of [label.wText, label.dText]) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = text;
+      chip.title = 'Use as the length of the line you drew';
+      chip.addEventListener('click', () => {
+        $('real-length').value = text;
+        setFieldError('scale-error', '');
+        setMode('calibrate');
+        $('real-length').focus();
+      });
+      row.appendChild(chip);
+    }
+
+    results.appendChild(row);
+  }
+}
+
 function renderCalibrateForm() {
   const form = $('calibrate-form');
   const active = store.ui.mode === 'calibrate' && Boolean(store.ui.measurement);
@@ -827,6 +904,7 @@ function renderPanel() {
   renderRoomList();
   renderSelection();
   renderCalibrateForm();
+  renderOcr();
 }
 
 // ── Actions ─────────────────────────────────────────────────────────────────
@@ -856,11 +934,13 @@ async function handleImageFile(file) {
     const image = await readImageFile(file);
     store.update((doc) => {
       doc.image = image;
+      doc.labels = [];
     });
     store.ui.view = null;
     fitView(store, refs.svg);
     store.setStatus('Now set the scale: drag a line across a wall you know the length of.');
     setMode('calibrate');
+    runOcr(image.dataUrl);
   } catch (err) {
     store.setStatus(err.message);
   }

@@ -81,6 +81,62 @@ body {
 
 .card[data-locked="true"] .locked-note { display: block; }
 
+.ocr {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.ocr-status {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.ocr-status[data-busy="true"]::after {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-left: 6px;
+  border: 1.5px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -1px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.ocr-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.ocr-label .room {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  flex: 1 0 100%;
+}
+
+.chip {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
 .field-error {
   font-size: 12px;
   line-height: 1.45;

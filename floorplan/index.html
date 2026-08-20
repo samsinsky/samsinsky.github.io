@@ -35,6 +35,10 @@
     <section class="card" id="card-scale">
       <h2><span class="step">2</span> Scale</h2>
       <button class="button block" id="btn-calibrate" type="button">Drag a line to set scale</button>
+      <div class="ocr" id="ocr-block" hidden>
+        <p class="ocr-status" id="ocr-status"></p>
+        <div id="ocr-results"></div>
+      </div>
       <div id="calibrate-form" class="subform" hidden>
         <label for="real-length">That line's real length</label>
         <input type="text" id="real-length" placeholder="14'5 or 173 or 14' 5&quot;" autocomplete="off">
