@@ -1,18 +1,7 @@
-/* Matches samsinsky.com: warm paper ground, Space Grotesk headings,
-   DM Sans body, white cards at 14px radius. */
+/* Floorplan tool. Design tokens and form controls come from
+   ../shared/ui.css, which must be linked first. */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --paper: rgb(240, 233, 226);
-  --ink: oklch(20% 0.01 240);
-  --ink-soft: oklch(55% 0.015 240);
-  --ink-faint: oklch(68% 0.015 240);
-  --line: oklch(90% 0.01 240);
-  --line-soft: oklch(94% 0.008 240);
-  --accent: oklch(48% 0.09 245);
-  --danger: oklch(52% 0.15 25);
-}
 
 html, body { height: 100%; }
 
@@ -207,19 +196,6 @@ input[type="text"]:focus, select:focus {
   outline: none;
   border-color: var(--accent);
 }
-
-.check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 13px;
-  color: var(--ink);
-  margin: 8px 0;
-}
-
-.check input { margin: 0; }
 
 .button {
   display: inline-flex;
