@@ -313,6 +313,11 @@ input[type="text"]:focus, select:focus {
 .corner-picker button[aria-pressed="true"] span { color: var(--accent); }
 .corner-picker button { color: var(--ink-faint); }
 .corner-picker button[aria-pressed="true"] { color: var(--accent); }
+/* Four door options read better in a row than stacked two-up. */
+.door-picker { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.door-picker button { padding: 4px; gap: 0; }
+.door-picker button svg { height: 30px; }
+
 .corner-picker button:hover { border-color: var(--ink-faint); }
 .corner-picker button[aria-pressed="true"] {
   border-color: var(--accent);

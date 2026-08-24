@@ -20,6 +20,7 @@ const MIN_VIEW = 12;        // inches across — about a foot
 const MAX_VIEW = 40000;     // inches across — comfortably past any apartment
 const DOOR_SNAP = 18;       // inches
 const CLOSE_LOOP = 14;      // screen px within which a trace click closes
+const MIN_DOOR = 6;         // inches — below this a drag was a stray tap
 const ROTATE_SNAP = 15;     // degrees
 
 function toWorld(svg, clientX, clientY) {
@@ -167,8 +168,20 @@ export function attachInteractions(store, refs) {
       return;
     }
 
-    if (mode === 'trace-room' || mode === 'place-door') {
-      // Placement happens on click, not drag; a drag still pans.
+    if (mode === 'place-door') {
+      // Drag from one jamb to the other. One gesture, and the swing is drawn
+      // the whole way so it is chosen by eye rather than discovered after.
+      const from = snapToWall(store.doc, world);
+      const defaults = store.ui.doorDefaults || { hinge: 'p1', swing: 'cw' };
+      drag = { kind: 'door' };
+      store.updateUi((ui) => {
+        ui.draft = { kind: 'door', p1: from, cursor: from, ...defaults };
+      });
+      return;
+    }
+
+    if (mode === 'trace-room') {
+      // Corners land on click, not drag; a drag still pans.
       drag = { kind: 'maybe-pan', start: { x: e.clientX, y: e.clientY }, origin: { ...store.ui.view }, moved: false };
       return;
     }
@@ -247,17 +260,11 @@ export function attachInteractions(store, refs) {
     const world = toWorld(svg, e.clientX, e.clientY);
 
     // Live cursor feedback while tracing.
-    if (!drag && (store.ui.mode === 'trace-room' || store.ui.mode === 'place-door')) {
-      if (store.ui.draft) {
-        let cursor = world;
-        if (store.ui.mode === 'trace-room' && store.ui.draft.points?.length) {
-          const last = store.ui.draft.points[store.ui.draft.points.length - 1];
-          cursor = snapToAxis(last, world);
-        }
-        store.updateUi((ui) => {
-          ui.draft.cursor = cursor;
-        });
-      }
+    if (!drag && store.ui.mode === 'trace-room' && store.ui.draft?.points?.length) {
+      const last = store.ui.draft.points[store.ui.draft.points.length - 1];
+      store.updateUi((ui) => {
+        ui.draft.cursor = snapToAxis(last, world);
+      });
       return;
     }
 
@@ -277,6 +284,14 @@ export function attachInteractions(store, refs) {
       store.ui.view.x = drag.origin.x - (e.clientX - drag.start.x) * scale;
       store.ui.view.y = drag.origin.y - (e.clientY - drag.start.y) * scale;
       store.emit();
+      return;
+    }
+
+    if (drag.kind === 'door') {
+      const to = snapToWall(store.doc, world);
+      store.updateUi((ui) => {
+        if (ui.draft) ui.draft.cursor = e.shiftKey ? to : snapToAxis(ui.draft.p1, to);
+      });
       return;
     }
 
@@ -323,6 +338,32 @@ export function attachInteractions(store, refs) {
     drag = null;
     if (!wasDrag) return;
 
+    if (wasDrag.kind === 'door') {
+      const draft = store.ui.draft;
+      const span = draft?.cursor ? dist(draft.p1, draft.cursor) : 0;
+
+      if (!draft || span < MIN_DOOR) {
+        store.updateUi((ui) => {
+          ui.draft = null;
+        });
+        store.setStatus('Drag from one side of the doorway to the other.');
+        return;
+      }
+
+      const id = newId('door');
+      const { p1, cursor, hinge, swing } = draft;
+      store.update((doc) => {
+        doc.doors.push({ id, p1, p2: cursor, hinge, swing });
+      });
+      store.updateUi((ui) => {
+        ui.draft = null;
+        ui.mode = 'select';
+        ui.selection = { kind: 'door', id };
+      });
+      store.setStatus(`${formatInches(span)} door placed. Pick how it opens in the panel.`);
+      return;
+    }
+
     if (wasDrag.kind === 'measure') {
       const m = store.ui.measurement;
       if (m && dist(m.p1, m.p2) < 4) {
@@ -341,61 +382,34 @@ export function attachInteractions(store, refs) {
 
   // ── Click placement for tracing and doors ──
 
+  // ── Click placement for tracing ──
+
   svg.addEventListener('click', (e) => {
-    const mode = store.ui.mode;
-    if (mode !== 'trace-room' && mode !== 'place-door') return;
+    if (store.ui.mode !== 'trace-room') return;
 
     const world = toWorld(svg, e.clientX, e.clientY);
-
-    if (mode === 'trace-room') {
-      store.updateUi((ui) => {
-        if (!ui.draft || ui.draft.kind !== 'room') ui.draft = { kind: 'room', points: [] };
-      });
-
-      const draft = store.ui.draft;
-      let point = world;
-
-      if (draft.points.length) {
-        const last = draft.points[draft.points.length - 1];
-        point = snapToAxis(last, world);
-
-        // Clicking near the first point closes the loop.
-        if (draft.points.length >= 3 && dist(world, draft.points[0]) / wpp() < CLOSE_LOOP) {
-          finishRoom(store);
-          return;
-        }
-      }
-
-      store.updateUi((ui) => {
-        ui.draft.points.push(point);
-        ui.draft.cursor = null;
-      });
-      return;
-    }
-
-    // place-door
-    const point = snapToWall(store.doc, world);
-    if (!store.ui.draft || store.ui.draft.kind !== 'door') {
-      store.updateUi((ui) => {
-        ui.draft = { kind: 'door', p1: point };
-      });
-      store.setStatus('Click the other side of the doorway.');
-      return;
-    }
-
-    const p1 = store.ui.draft.p1;
-    if (dist(p1, point) < 4) return;
-
-    const id = newId('door');
-    store.update((doc) => {
-      doc.doors.push({ id, p1, p2: point, hinge: 'p1', swing: 'cw' });
-    });
     store.updateUi((ui) => {
-      ui.draft = null;
-      ui.mode = 'select';
-      ui.selection = { kind: 'door', id };
+      if (!ui.draft || ui.draft.kind !== 'room') ui.draft = { kind: 'room', points: [] };
     });
-    store.setStatus('Door placed. Use the panel to flip the hinge or swing.');
+
+    const draft = store.ui.draft;
+    let point = world;
+
+    if (draft.points.length) {
+      const last = draft.points[draft.points.length - 1];
+      point = snapToAxis(last, world);
+
+      // Clicking near the first point closes the loop.
+      if (draft.points.length >= 3 && dist(world, draft.points[0]) / wpp() < CLOSE_LOOP) {
+        finishRoom(store);
+        return;
+      }
+    }
+
+    store.updateUi((ui) => {
+      ui.draft.points.push(point);
+      ui.draft.cursor = null;
+    });
   });
 
   // ── Keyboard ──

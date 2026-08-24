@@ -4,6 +4,7 @@
 import {
   pieceLocal,
   pieceLabelAnchor,
+  doorPath,
   formatInches,
   formatArea,
   dist,
@@ -177,27 +178,15 @@ function paintDoors(store, refs) {
 
   for (const door of store.doc.doors) {
     const selected = selection?.kind === 'door' && selection.id === door.id;
-    const hinge = door.hinge === 'p2' ? door.p2 : door.p1;
-    const free = door.hinge === 'p2' ? door.p1 : door.p2;
-
-    const width = dist(hinge, free);
-    if (width <= 0) continue;
-
-    // Swing the leaf a quarter turn off the closed position.
-    const ux = (free.x - hinge.x) / width;
-    const uy = (free.y - hinge.y) / width;
-    const sign = door.swing === 'ccw' ? -1 : 1;
-    const tip = {
-      x: hinge.x - sign * uy * width,
-      y: hinge.y + sign * ux * width,
-    };
+    const d = doorPath(door.p1, door.p2, door.hinge, door.swing);
+    if (!d) continue;
 
     const g = el('g', { 'data-kind': 'door', 'data-id': door.id });
     const stroke = selected ? '#b4643c' : 'rgba(60,40,30,0.75)';
 
     g.appendChild(
       el('path', {
-        d: `M ${hinge.x} ${hinge.y} L ${tip.x} ${tip.y} A ${width} ${width} 0 0 ${door.swing === 'ccw' ? 0 : 1} ${free.x} ${free.y}`,
+        d,
         fill: 'none',
         stroke,
         'stroke-width': selected ? 3 : 2,
@@ -207,10 +196,10 @@ function paintDoors(store, refs) {
     // The opening itself, so the door reads against the wall it sits in.
     g.appendChild(
       el('line', {
-        x1: hinge.x,
-        y1: hinge.y,
-        x2: free.x,
-        y2: free.y,
+        x1: door.p1.x,
+        y1: door.p1.y,
+        x2: door.p2.x,
+        y2: door.p2.y,
         stroke,
         'stroke-width': 1,
         'stroke-dasharray': '4 4',
@@ -338,21 +327,51 @@ function paintOverlay(store, refs, wpp) {
     }
   }
 
-  // First click of a door, waiting for the second.
+  // The door being dragged out, drawn in full so the swing is visible before
+  // it is committed rather than discovered afterwards.
   if (ui.draft?.kind === 'door' && ui.draft.p1) {
     const to = ui.draft.cursor || ui.draft.p1;
+    const d = doorPath(ui.draft.p1, to, ui.draft.hinge, ui.draft.swing);
+
+    if (d) {
+      refs.overlay.appendChild(
+        el('path', {
+          d,
+          fill: 'rgba(180,100,60,0.10)',
+          stroke: '#b4643c',
+          'stroke-width': 2,
+          'vector-effect': 'non-scaling-stroke',
+        }),
+      );
+    }
     refs.overlay.appendChild(
       el('line', {
-        x1: ui.draft.p1.x,
-        y1: ui.draft.p1.y,
-        x2: to.x,
-        y2: to.y,
+        x1: ui.draft.p1.x, y1: ui.draft.p1.y, x2: to.x, y2: to.y,
         stroke: '#b4643c',
-        'stroke-width': 2,
-        'stroke-dasharray': '6 4',
+        'stroke-width': 3,
         'vector-effect': 'non-scaling-stroke',
       }),
     );
+
+    const span = dist(ui.draft.p1, to);
+    if (span > 0) {
+      const m = midpoint(ui.draft.p1, to);
+      refs.overlay.appendChild(Object.assign(
+        el('text', {
+          x: m.x,
+          y: m.y - 12 * wpp,
+          'text-anchor': 'middle',
+          'font-size': 13 * wpp,
+          'font-family': 'system-ui, sans-serif',
+          'font-weight': 600,
+          fill: '#b4643c',
+          stroke: '#ffffff',
+          'stroke-width': 3 * wpp,
+          'paint-order': 'stroke',
+        }),
+        { textContent: formatInches(span) },
+      ));
+    }
   }
 
   // Calibration / verification line. Stored in image pixels, drawn in world.

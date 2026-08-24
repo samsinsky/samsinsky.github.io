@@ -9,6 +9,11 @@ import {
   dist,
   lShapeLocal,
   lArmCentres,
+  bounds,
+  doorGeometry,
+  doorPath,
+  DOOR_HINGES,
+  DOOR_SWINGS,
 } from './geometry.js';
 import {
   Store,
@@ -545,28 +550,66 @@ function renderSelection() {
     const door = store.doc.doors.find((d) => d.id === selection.id);
     if (!door) return;
 
-    const width = document.createElement('p');
-    width.className = 'hint';
-    width.textContent = `${formatInches(dist(door.p1, door.p2))} wide`;
-    body.appendChild(width);
+    body.appendChild(field('Opening width', formatInches(dist(door.p1, door.p2)), (value, input) => {
+      const inches = parseInches(value);
+      if (inches === null || inches < 6 || inches > 240) {
+        store.setStatus('A doorway is somewhere between 6 inches and 20 feet.');
+        input.value = formatInches(dist(door.p1, door.p2));
+        return;
+      }
+      // Resize about the hinge, so the side you chose stays put.
+      store.update((doc) => {
+        const t = doc.doors.find((d) => d.id === door.id);
+        if (!t) return;
+        const g = doorGeometry(t.p1, t.p2, t.hinge, t.swing);
+        const ux = (g.free.x - g.pivot.x) / g.width;
+        const uy = (g.free.y - g.pivot.y) / g.width;
+        const moved = { x: g.pivot.x + ux * inches, y: g.pivot.y + uy * inches };
+        if (t.hinge === 'p2') t.p1 = moved;
+        else t.p2 = moved;
+      });
+      store.setStatus('');
+    }));
 
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.append(
-      button('Flip hinge', () => {
+    const widthRow = document.createElement('div');
+    widthRow.className = 'row';
+    for (const preset of [28, 30, 32, 36]) {
+      widthRow.appendChild(button(`${preset}"`, () => {
         store.update((doc) => {
           const t = doc.doors.find((d) => d.id === door.id);
-          if (t) t.hinge = t.hinge === 'p1' ? 'p2' : 'p1';
+          if (!t) return;
+          const g = doorGeometry(t.p1, t.p2, t.hinge, t.swing);
+          const ux = (g.free.x - g.pivot.x) / g.width;
+          const uy = (g.free.y - g.pivot.y) / g.width;
+          const moved = { x: g.pivot.x + ux * preset, y: g.pivot.y + uy * preset };
+          if (t.hinge === 'p2') t.p1 = moved;
+          else t.p2 = moved;
         });
-      }),
-      button('Flip swing', () => {
-        store.update((doc) => {
-          const t = doc.doors.find((d) => d.id === door.id);
-          if (t) t.swing = t.swing === 'cw' ? 'ccw' : 'cw';
-        });
-      }),
-    );
-    body.appendChild(row);
+        lastSelectionKey = null;
+        renderSelection();
+      }));
+    }
+    body.appendChild(widthRow);
+
+    const swingLabel = document.createElement('label');
+    swingLabel.textContent = 'Which side, and which way';
+    body.appendChild(swingLabel);
+
+    const picker = document.createElement('div');
+    picker.className = 'corner-picker door-picker';
+    body.appendChild(doorPicker(picker, door, ({ hinge, swing }) => {
+      store.update((doc) => {
+        const t = doc.doors.find((d) => d.id === door.id);
+        if (t) {
+          t.hinge = hinge;
+          t.swing = swing;
+        }
+      });
+      // Next door starts the way this one ended up.
+      store.ui.doorDefaults = { hinge, swing };
+      lastSelectionKey = null;
+      renderSelection();
+    }));
 
     const row2 = document.createElement('div');
     row2.className = 'row';
@@ -772,6 +815,83 @@ function colourPicker(current, onPick) {
   wrap.appendChild(custom);
 
   return wrap;
+}
+
+const DOOR_LABELS = {
+  'p1-cw': 'Left, in',
+  'p1-ccw': 'Left, out',
+  'p2-cw': 'Right, out',
+  'p2-ccw': 'Right, in',
+};
+
+function doorThumb(hinge, swing) {
+  // A fixed horizontal opening, so the four options differ only in the way the
+  // leaf swings — which is the whole question being asked.
+  const p1 = { x: -18, y: 0 };
+  const p2 = { x: 18, y: 0 };
+  const g = doorGeometry(p1, p2, hinge, swing);
+
+  // The wall runs past the opening on both sides, so left and right read.
+  const wall = { a: { x: -30, y: 0 }, b: { x: 30, y: 0 } };
+
+  // The arc bulges furthest at its midpoint: one radius along the bisector of
+  // the leaf and the closed position. Fitting the box to that keeps every
+  // option fully in frame instead of clipped at the edges.
+  const bisector = {
+    x: (g.tip.x - g.pivot.x) + (g.free.x - g.pivot.x),
+    y: (g.tip.y - g.pivot.y) + (g.free.y - g.pivot.y),
+  };
+  const len = Math.hypot(bisector.x, bisector.y) || 1;
+  const arcMid = {
+    x: g.pivot.x + (bisector.x / len) * g.width,
+    y: g.pivot.y + (bisector.y / len) * g.width,
+  };
+
+  const box = bounds([g.pivot, g.free, g.tip, arcMid, wall.a, wall.b]);
+  const pad = 5;
+  const svg = svgEl('svg', {
+    viewBox: `${box.minX - pad} ${box.minY - pad} ${box.width + pad * 2} ${box.height + pad * 2}`,
+    preserveAspectRatio: 'xMidYMid meet',
+  });
+
+  svg.appendChild(svgEl('line', {
+    x1: wall.a.x, y1: wall.a.y, x2: wall.b.x, y2: wall.b.y,
+    stroke: 'currentColor',
+    'stroke-width': 3,
+    opacity: 0.25,
+    'vector-effect': 'non-scaling-stroke',
+  }));
+  svg.appendChild(svgEl('path', {
+    d: doorPath(p1, p2, hinge, swing),
+    fill: 'currentColor',
+    'fill-opacity': 0.13,
+    stroke: 'currentColor',
+    'stroke-width': 1.5,
+    'stroke-linejoin': 'round',
+    'vector-effect': 'non-scaling-stroke',
+  }));
+  svg.appendChild(svgEl('circle', {
+    cx: g.pivot.x, cy: g.pivot.y, r: 3.5, fill: 'currentColor',
+  }));
+  return svg;
+}
+
+function doorPicker(container, current, onPick) {
+  container.textContent = '';
+  for (const hinge of DOOR_HINGES) {
+    for (const swing of DOOR_SWINGS) {
+      const key = `${hinge}-${swing}`;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.title = DOOR_LABELS[key];
+      b.setAttribute('aria-label', `Hinge and swing: ${DOOR_LABELS[key]}`);
+      b.setAttribute('aria-pressed', String(current.hinge === hinge && current.swing === swing));
+      b.appendChild(doorThumb(hinge, swing));
+      b.addEventListener('click', () => onPick({ hinge, swing }));
+      container.appendChild(b);
+    }
+  }
+  return container;
 }
 
 function refreshCornerPicker() {

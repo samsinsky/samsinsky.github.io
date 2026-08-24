@@ -251,6 +251,48 @@ export function bounds(points) {
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
+// ── Doors ───────────────────────────────────────────────────────────────────
+// A door is an opening between two jambs plus two choices: which jamb it
+// hinges on, and which side it sweeps to. Four combinations, and the only way
+// anyone reliably tells them apart is by looking at the arc — so this returns
+// the geometry for drawing, and the picker draws all four.
+
+export const DOOR_HINGES = ['p1', 'p2'];
+export const DOOR_SWINGS = ['cw', 'ccw'];
+
+export function doorGeometry(p1, p2, hinge = 'p1', swing = 'cw') {
+  const pivot = hinge === 'p2' ? p2 : p1;
+  const free = hinge === 'p2' ? p1 : p2;
+  const width = dist(pivot, free);
+  if (!width) return null;
+
+  const ux = (free.x - pivot.x) / width;
+  const uy = (free.y - pivot.y) / width;
+  const sign = swing === 'ccw' ? -1 : 1;
+
+  return {
+    pivot,
+    free,
+    width,
+    // The open leaf: a quarter turn off the closed position.
+    tip: { x: pivot.x - sign * uy * width, y: pivot.y + sign * ux * width },
+    // The arc runs from the open leaf back to the closed position. SVG's
+    // sweep flag is 1 for increasing angle; a clockwise door travels the
+    // other way, so it is 0. Get this backwards and SVG picks the arc on the
+    // other candidate circle, which bows away from the door instead of
+    // tracing it.
+    sweep: swing === 'ccw' ? 1 : 0,
+  };
+}
+
+// Leaf line from the pivot, then the arc back to the closed position.
+export function doorPath(p1, p2, hinge, swing) {
+  const g = doorGeometry(p1, p2, hinge, swing);
+  if (!g) return '';
+  return `M ${g.pivot.x} ${g.pivot.y} L ${g.tip.x} ${g.tip.y} `
+    + `A ${g.width} ${g.width} 0 0 ${g.sweep} ${g.free.x} ${g.free.y}`;
+}
+
 // ── Snapping ────────────────────────────────────────────────────────────────
 
 export function snapToGrid(value, size) {

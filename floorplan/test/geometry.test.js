@@ -19,6 +19,11 @@ import {
   pieceLocal,
   pieceCorners,
   pieceLabelAnchor,
+  doorGeometry,
+  doorPath,
+  DOOR_HINGES,
+  DOOR_SWINGS,
+  dist,
 } from '../geometry.js';
 
 // The sectional from the design: 84" run, 36" deep, with a 36"-wide chaise
@@ -331,4 +336,104 @@ test('the label anchor lands on solid footprint, not in the notch', () => {
   assert.deepEqual(southern, { x: 0, y: 32 - 18 });
 
   assert.deepEqual(pieceLabelAnchor({ w: 84, d: 36 }), { x: 0, y: 0 }, 'rectangles centre');
+});
+
+test('a door leaf opens perpendicular to its opening', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+  const g = doorGeometry(a, b, 'p1', 'cw');
+
+  assert.equal(g.width, 36);
+  assert.deepEqual(g.pivot, a, 'hinged on p1');
+  assert.deepEqual(g.free, b);
+  // Opening runs along +x, so a clockwise leaf points along +y.
+  assert.ok(Math.abs(g.tip.x - 0) < 1e-9);
+  assert.ok(Math.abs(g.tip.y - 36) < 1e-9);
+});
+
+test('swing flips the leaf to the other side, hinge stays put', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+  const cw = doorGeometry(a, b, 'p1', 'cw');
+  const ccw = doorGeometry(a, b, 'p1', 'ccw');
+
+  assert.deepEqual(cw.pivot, ccw.pivot);
+  assert.ok(Math.abs(cw.tip.y + ccw.tip.y) < 1e-9, 'mirrored about the opening');
+  assert.notEqual(cw.sweep, ccw.sweep);
+});
+
+test('hinge picks which jamb the door turns on', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+  assert.deepEqual(doorGeometry(a, b, 'p2', 'cw').pivot, b);
+  assert.deepEqual(doorGeometry(a, b, 'p2', 'cw').free, a);
+});
+
+test('all four combinations are distinct', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+  const seen = new Set();
+  for (const hinge of DOOR_HINGES) {
+    for (const swing of DOOR_SWINGS) {
+      const g = doorGeometry(a, b, hinge, swing);
+      seen.add(`${g.pivot.x},${g.pivot.y}|${Math.round(g.tip.x)},${Math.round(g.tip.y)}`);
+    }
+  }
+  assert.equal(seen.size, 4);
+});
+
+test('the leaf is always the width of the opening', () => {
+  const a = { x: 10, y: 40 };
+  const b = { x: 34, y: 58 };          // a diagonal opening
+  for (const hinge of DOOR_HINGES) {
+    for (const swing of DOOR_SWINGS) {
+      const g = doorGeometry(a, b, hinge, swing);
+      assert.ok(Math.abs(dist(g.pivot, g.tip) - g.width) < 1e-9);
+    }
+  }
+});
+
+test('a zero-width opening has no geometry', () => {
+  assert.equal(doorGeometry({ x: 5, y: 5 }, { x: 5, y: 5 }, 'p1', 'cw'), null);
+  assert.equal(doorPath({ x: 5, y: 5 }, { x: 5, y: 5 }, 'p1', 'cw'), '');
+});
+
+test('doorPath draws leaf then arc', () => {
+  const d = doorPath({ x: 0, y: 0 }, { x: 36, y: 0 }, 'p1', 'cw');
+  assert.match(d, /^M 0 0 L 0 36 A 36 36 0 0 0 36 0$/);
+});
+
+// Derived from the geometry rather than pinned to a string, because the first
+// version of this pinned the wrong flag and the arc bowed away from the door.
+test('the sweep flag follows the direction the leaf actually travels', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+
+  for (const hinge of DOOR_HINGES) {
+    for (const swing of DOOR_SWINGS) {
+      const g = doorGeometry(a, b, hinge, swing);
+      // Signed turn from the open leaf back to the closed position. SVG sweeps
+      // in the direction of increasing angle when the flag is 1.
+      const from = { x: g.tip.x - g.pivot.x, y: g.tip.y - g.pivot.y };
+      const to = { x: g.free.x - g.pivot.x, y: g.free.y - g.pivot.y };
+      const cross = from.x * to.y - from.y * to.x;
+      assert.equal(g.sweep, cross > 0 ? 1 : 0, `${hinge}/${swing}`);
+    }
+  }
+});
+
+test('the arc stays a quarter turn, never the long way round', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 36, y: 0 };
+  for (const hinge of DOOR_HINGES) {
+    for (const swing of DOOR_SWINGS) {
+      const g = doorGeometry(a, b, hinge, swing);
+      const from = { x: g.tip.x - g.pivot.x, y: g.tip.y - g.pivot.y };
+      const to = { x: g.free.x - g.pivot.x, y: g.free.y - g.pivot.y };
+      const dot = from.x * to.x + from.y * to.y;
+      assert.ok(Math.abs(dot) < 1e-9, 'leaf and opening are perpendicular');
+      // large-arc-flag is 0 in doorPath, which is only correct for <= 180deg.
+      assert.match(doorPath(a, b, hinge, swing), / 0 [01] /);
+    }
+  }
 });
