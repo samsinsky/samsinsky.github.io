@@ -128,10 +128,31 @@ is within 12° of horizontal or vertical, it snaps to exact axis alignment — s
 rectangular rooms come out clean without precision clicking. Each room gets an
 editable name and displays its area in square feet.
 
-**Placing a door:** click two points. Each endpoint snaps to the nearest traced
-wall segment within 18"; with no rooms traced, the points land where clicked.
-Hinge side and swing direction are toggled after placement. Rendered as the standard architectural symbol: a leaf line plus a
-quarter arc.
+**Placing a door:** drag from one jamb to the other — one gesture, with the
+full symbol drawn the whole way so the swing is chosen by eye rather than
+discovered afterwards. The opening width reads out as you drag, and endpoints
+snap to a traced wall within 18" when there is one.
+
+**Which side, and which way** is four choices, not two toggles. The first
+version offered *Flip hinge* and *Flip swing*, which meant poking at buttons to
+work out which of four states you were in. It is now a row of four thumbnails,
+each drawing the door it produces, complete with wall and hinge dot — the same
+answer that fixed the L-shape picker. Each thumbnail sizes its own viewBox to
+its own geometry, or the leaf gets clipped. The opening width is an editable
+field with 28/30/32/36" presets, and resizing pivots about the hinge so the
+side you chose stays put. The last orientation used becomes the default for the
+next door.
+
+**The arc must trace a real door.** `doorPath` emits an SVG arc, and its sweep
+flag was originally guessed rather than derived — it was inverted, so SVG chose
+the arc on the other candidate circle and it bowed away from the door instead
+of following it. This is invisible in isolation and obvious the moment it sits
+over a floorplan's own printed door symbol, which is how it was caught. The
+correct reasoning: the arc runs from the open leaf back to the closed position,
+so a clockwise door travels in *decreasing* angle, which is sweep `0`. The test
+now derives the expected flag from the cross product rather than pinning the
+string, because the original test pinned the wrong one.
+
 
 Doors exist purely as a visual reference. Nothing checks whether furniture
 blocks them.
