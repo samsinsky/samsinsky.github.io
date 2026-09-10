@@ -61,14 +61,39 @@ h1 {
 }
 p { margin-bottom: 14px; }
 .muted { color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.crumbs {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
 .step-count {
   font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-faint);
-  margin-bottom: 16px;
 }
+
+/* Sits beside the counter, so it is deliberately quieter than Back/Next --
+   leaving mid-run is always available but never the suggested move. */
+button.link {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color .12s ease;
+}
+button.link:hover:not(:disabled) { background: none; color: var(--ink); }
+button.link:active:not(:disabled) { transform: none; }
+button.link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ── The reply under judgement ── */
 .reply {
@@ -413,7 +438,10 @@ function render() {
 
   $("bar").style.width = `${(state.at / order.length) * 100}%`;
   $("screen").innerHTML = `
-    <p class="step-count">${state.at + 1} of ${order.length}${state.mode === "calibration" ? " &middot; practice" : ""}</p>
+    <div class="crumbs">
+      <span class="step-count">${state.at + 1} of ${order.length}${state.mode === "calibration" ? " &middot; practice" : ""}</span>
+      <button class="link" onclick="goHome()">Start screen</button>
+    </div>
     <div class="reply">${escapeHtml(item)}</div>
     <p class="statement">${escapeHtml(PAYLOAD.statements[target])}</p>
     <p class="muted">How much do you agree or disagree with that statement?</p>
@@ -437,6 +465,15 @@ function capture() {
     ts: new Date().toISOString(),
   };
   save();
+}
+
+// Leaving mid-run loses nothing: every answer is already written to storage,
+// and the start screen reports how far this name has got. The current screen is
+// captured on the way out so a selection made but not yet advanced past is kept
+// too -- the same thing Back does.
+function goHome() {
+  capture();
+  start();
 }
 
 function step(delta) {
