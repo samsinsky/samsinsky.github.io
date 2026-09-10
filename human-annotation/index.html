@@ -236,7 +236,38 @@ function load(name, mode) {
   return null;
 }
 
+// The name is remembered separately from the progress, and deliberately not
+// keyed by PAYLOAD.version: it identifies the person, not the study, so it
+// should survive a rebuild.
+//
+// This is not just convenience. Progress is keyed by the normalised name, and
+// so is the screen order -- so someone who types "sam s" on day two when they
+// typed "sam" on day one gets a clean slate and a different order, silently,
+// with a day's work still sitting in storage under the other key. Remembering
+// the name is what stops that.
+const NAME_KEY = "wlk-annot:name";
+
+function rememberName(name) {
+  try { localStorage.setItem(NAME_KEY, name.trim()); } catch (e) {}
+}
+
+function rememberedName() {
+  try { return localStorage.getItem(NAME_KEY) || ""; } catch (e) { return ""; }
+}
+
+// How far a remembered name has got, so a mistyped name is visible as a run
+// that unexpectedly reports no progress rather than as a silent restart.
+function progressFor(name) {
+  if (!name.trim()) return null;
+  const saved = load(name, "main");
+  if (!saved) return null;
+  const answered = Object.values(saved.answers || {}).filter((a) => a.rating).length;
+  return { answered, total: PAYLOAD.screens_main };
+}
+
 function start() {
+  const remembered = rememberedName();
+  const resume = progressFor(remembered);
   const html = `
     <h1>Reply coding</h1>
     <p>You will work through ${PAYLOAD.screens_main} screens. Each shows a short reply
@@ -247,9 +278,23 @@ function start() {
        <input type="text" id="name" autocomplete="name" placeholder="e.g. Sam"></p>
     <nav>
       <button onclick="begin('calibration')">Practice (${PAYLOAD.screens_cal} screens)</button>
-      <button class="primary" onclick="begin('main')">Start the real set (${PAYLOAD.screens_main} screens)</button>
-    </nav>`;
+      <button class="primary" onclick="begin('main')">${resume ? "Resume" : "Start"} the real set (${PAYLOAD.screens_main} screens)</button>
+    </nav>
+    <p class="muted" id="resume"></p>`;
   $("screen").innerHTML = html;
+
+  // Set the value as a property rather than interpolating it into the markup,
+  // so a name containing quotes or angle brackets cannot break out of it.
+  $("name").value = remembered;
+  $("name").addEventListener("input", showProgress);
+  showProgress();
+}
+
+function showProgress() {
+  const at = progressFor($("name").value);
+  $("resume").textContent = at
+    ? `Picking up where you left off \u2014 ${at.answered} of ${at.total} answered.`
+    : "";
 }
 
 // --- ordering: extracted and run under node by tests/test_annotation_form.py ---
@@ -328,6 +373,7 @@ function orderIsSound(screens, replyCount, minGap) {
 function begin(mode) {
   const name = $("name").value.trim();
   if (!name) { alert("Please enter your name first."); return; }
+  rememberName(name);
   state = load(name, mode) || { name, mode, at: 0, answers: {} };
 
   const trialIds = (mode === "calibration" ? PAYLOAD.calibration : PAYLOAD.items)
